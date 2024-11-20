@@ -4,7 +4,7 @@ using System.Collections;
 
 public class ServerManager : MonoBehaviour
 {
-    private string url = "http://127.0.0.1:5000/state"; // URL del servidor
+    private string url = "http://127.0.0.1:5000/state"; // URL del servidor tablero
 
     public IEnumerator GetGameState(System.Action<string> callback)
 {
