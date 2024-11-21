@@ -44,74 +44,87 @@ public class GameManager : MonoBehaviour
     {
         foreach (CellState cell in gameState)
         {
-            // Calcular la posición del suelo
-            Vector3 cellPosition = new Vector3(cell.cell_position[1] * cellSize, 0, -cell.cell_position[0] * cellSize);
+            int fila = cell.cell_position[0];
+            int columna = cell.cell_position[1];
 
-            // Crear el suelo para todas las celdas
+            // Calculamos la posición de la celda
+            float x = columna * cellSize;
+            float z = -fila * cellSize;
+            Vector3 cellPosition = new Vector3(x, 0, z);
+
             Instantiate(cellPrefab, cellPosition, Quaternion.identity, boardParent);
-            Debug.Log($"Celda creada en: {cellPosition}");
+            Debug.Log($"Celda creada en fila: {fila}, columna: {columna}, posición: {cellPosition}");
 
-            // Crear las paredes solo para la celda en [0,0]
-            if (cell.cell_position[0] == 0 && cell.cell_position[1] == 0)
+            // Crear las paredes basándose en las celdas y agentes
+            foreach (AgentData agent in cell.agents)
             {
-                foreach (AgentData agent in cell.agents)
+                if (agent.type == "CellAgent")
                 {
-                    if (agent.type == "CellAgent")
-                    {
-                        CreateWalls(agent, cellPosition); // Crear paredes para la celda [0,0]
-                    }
+                    CreateWalls(agent, fila, columna); // Evaluar paredes
                 }
             }
         }
     }
 
-   void CreateWalls(AgentData agent, Vector3 cellPosition)
-{
-    float wallHeight = 7.1f; // Altura de las paredes
-    float offsetX = 2.2f;    // Desplazamiento en X para las paredes izquierda y derecha
-    float offsetZ = 7.2f;    // Desplazamiento en Z para las paredes superior e inferior
-    float lowerOffsetX = -11.2f; // Ajuste en X para la pared inferior
-    float lowerOffsetZ = -2.8f;  // Ajuste en Z para la pared inferior
-
-    // Pared superior (arriba)
-    if (agent.walls[0] == '1')
+    void CreateWalls(AgentData agent, int fila, int columna)
     {
-        Vector3 position = cellPosition + new Vector3(0, wallHeight, offsetZ);
-        Quaternion rotation = Quaternion.identity; // Sin rotación
-        InstantiateWall(position, rotation, "Pared superior");
+        float wallHeight = 7.1f; // Altura de las paredes
+        float cellSize = 19.96322f;
+
+        // Desplazamientos iniciales basados en tus cálculos
+        float offsetX_ParedArriba = 6.8f;
+        float offsetX_ParedAbajo = 9.16322f;
+        float offsetX_ParedIzquierda = -2.2f;
+        float offsetX_ParedDerecha = -1.8f;
+
+        float offsetZ_ParedArriba = -2.8f;
+        float offsetZ_ParedIzquierda = 7.2f;
+        float offsetZ_ParedAbajo = -2.8f;
+        float offsetZ_ParedDerecha = -11f;
+
+        // Pared superior
+        if (agent.walls[0] == '1')
+        {
+            float x = offsetX_ParedArriba + columna * cellSize;
+            float z = offsetZ_ParedArriba - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            InstantiateWall(position, Quaternion.identity, "Pared superior");
+        }
+
+        // Pared izquierda
+        if (agent.walls[1] == '1')
+        {
+            float x = offsetX_ParedIzquierda + columna * cellSize;
+            float z = offsetZ_ParedIzquierda - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            Quaternion rotation = Quaternion.Euler(0, 90, 0);
+            InstantiateWall(position, rotation, "Pared izquierda");
+        }
+
+        // Pared inferior
+        if (agent.walls[2] == '1')
+        {
+            float x = offsetX_ParedAbajo + columna * cellSize;
+            float z = offsetZ_ParedAbajo - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            InstantiateWall(position, Quaternion.identity, "Pared inferior");
+        }
+
+        // Pared derecha
+        if (agent.walls[3] == '1')
+        {
+            float x = offsetX_ParedDerecha + columna * cellSize;
+            float z = offsetZ_ParedDerecha - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            Quaternion rotation = Quaternion.Euler(0, 90, 0);
+            InstantiateWall(position, rotation, "Pared derecha");
+        }
     }
 
-    // Pared izquierda
-    if (agent.walls[1] == '1')
+    void InstantiateWall(Vector3 position, Quaternion rotation, string wallName)
     {
-        Vector3 position = cellPosition + new Vector3(-offsetX, wallHeight, offsetZ); // Ajuste en Z
-        Quaternion rotation = Quaternion.Euler(0, 90, 0); // Rotación 90 grados
-        InstantiateWall(position, rotation, "Pared izquierda");
+        GameObject wall = Instantiate(wallPrefab, position, rotation, boardParent);
+        wall.name = wallName;
+        Debug.Log($"{wallName} creada en: {position}");
     }
-
-    // Pared inferior (ajustando X y Z)
-    if (agent.walls[2] == '1')
-    {
-        Vector3 position = cellPosition + new Vector3(lowerOffsetX, wallHeight, lowerOffsetZ); // Ajuste en X y Z
-        Quaternion rotation = Quaternion.identity; // Sin rotación
-        InstantiateWall(position, rotation, "Pared inferior");
-    }
-
-    // Pared derecha
-    if (agent.walls[3] == '1')
-    {
-        Vector3 position = cellPosition + new Vector3(offsetX, wallHeight, 0);
-        Quaternion rotation = Quaternion.Euler(0, 90, 0); // Rotación 90 grados
-        InstantiateWall(position, rotation, "Pared derecha");
-    }
-}
-
-void InstantiateWall(Vector3 position, Quaternion rotation, string wallName)
-{
-    GameObject wall = Instantiate(wallPrefab, position, rotation, boardParent);
-    wall.name = wallName;
-    Debug.Log($"{wallName} creada en: {position}");
-}
-
-
 }
