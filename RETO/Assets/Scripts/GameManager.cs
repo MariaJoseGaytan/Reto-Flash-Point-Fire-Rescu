@@ -157,7 +157,7 @@ public class GameManager : MonoBehaviour
     // Método para instanciar la puerta en el lugar correcto
     void InstantiateDoor(int fila, int columna, int connectedFila, int connectedColumna)
     {
-        float doorHeight = 7.1f; // Altura de la puerta
+        float doorHeight = -1f; // Altura de la puerta
 
         // Desplazamientos basados en cálculos
         float offsetX_ParedArriba = 6.8f;
