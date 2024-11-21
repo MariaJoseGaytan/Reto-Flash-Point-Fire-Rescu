@@ -442,6 +442,7 @@ MonoBehaviour:
   wallPrefab: {fileID: 3247954694777154470, guid: 5f24444c92ded4b2592798b0add24940, type: 3}
   fMarkerPrefab: {fileID: 4952696186464551668, guid: 1ed9eb9a2cf2e44fb996f21bd493a92b, type: 3}
   vMarkerPrefab: {fileID: 6068680867506744118, guid: ea9bd1ac2e6ae463c8d2c237bd16d913, type: 3}
+  fireMarkerPrefab: {fileID: 7646042881320776195, guid: 74ef7b08a5962452993037ae15b16c14, type: 3}
   boardParent: {fileID: 3347108900013558069, guid: c34b9e3e0ab3648a6b5a5a6a0cad2dda, type: 3}
 --- !u!4 &1649286202
 Transform:

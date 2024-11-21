@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour
     public GameObject wallPrefab;      // Prefab de las paredes
     public GameObject fMarkerPrefab;   // Prefab para marker_type "f"
     public GameObject vMarkerPrefab;   // Prefab para marker_type "v"
+    public GameObject fireMarkerPrefab; // Prefab para FireMarkerAgent
 
     // Padre para organizar las celdas
     public Transform boardParent;
@@ -67,6 +68,10 @@ public class GameManager : MonoBehaviour
                 else if (agent.type == "MarkerAgent")
                 {
                     PlaceMarker(agent, fila, columna); // Colocar marcador
+                }
+                 else if (agent.type == "FireMarkerAgent")
+                {
+                    PlaceFireMarker(agent, cellPosition); // Colocar marcador de fuego
                 }
             }
         }
@@ -165,5 +170,18 @@ public class GameManager : MonoBehaviour
         GameObject marker = Instantiate(markerPrefab, markerPosition, Quaternion.identity, boardParent);
         marker.name = $"Marker_{agent.unique_id}";
         Debug.Log($"Marcador '{agent.marker_type}' instanciado en: {markerPosition}");
+    }
+
+    void PlaceFireMarker(AgentData agent, Vector3 cellPosition)
+    {
+        float markerHeight = 7.3f; // Altura del marcador de fuego
+
+        // Posición del marcador: centro de la celda, a una altura específica
+        Vector3 markerPosition = new Vector3(cellPosition.x, markerHeight, cellPosition.z);
+
+        // Instanciar el marcador de fuego
+        GameObject marker = Instantiate(fireMarkerPrefab, markerPosition, Quaternion.identity, boardParent);
+        marker.name = $"FireMarker_{agent.unique_id}";
+        Debug.Log($"FireMarker instanciado en: {markerPosition}");
     }
 }
