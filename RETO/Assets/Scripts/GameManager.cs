@@ -104,7 +104,8 @@ public class GameManager : MonoBehaviour
         // Pared inferior
         if (agent.walls[2] == '1')
         {
-            float x = offsetX_ParedAbajo + columna * cellSize;
+            // Restamos una posición anterior posible en el eje X
+            float x = offsetX_ParedAbajo + (columna - 1) * cellSize;
             float z = offsetZ_ParedAbajo - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             InstantiateWall(position, Quaternion.identity, "Pared inferior");
