@@ -7,8 +7,10 @@ public class GameManager : MonoBehaviour
     public ServerManager serverManager;
 
     // Referencias a los prefabs
-    public GameObject cellPrefab;  // Prefab del suelo
-    public GameObject wallPrefab;  // Prefab de las paredes
+    public GameObject cellPrefab;      // Prefab del suelo
+    public GameObject wallPrefab;      // Prefab de las paredes
+    public GameObject fMarkerPrefab;   // Prefab para marker_type "f"
+    public GameObject vMarkerPrefab;   // Prefab para marker_type "v"
 
     // Padre para organizar las celdas
     public Transform boardParent;
@@ -61,6 +63,10 @@ public class GameManager : MonoBehaviour
                 if (agent.type == "CellAgent")
                 {
                     CreateWalls(agent, fila, columna); // Evaluar paredes
+                }
+                else if (agent.type == "MarkerAgent")
+                {
+                    PlaceMarker(agent, fila, columna); // Colocar marcador
                 }
             }
         }
@@ -127,5 +133,37 @@ public class GameManager : MonoBehaviour
         GameObject wall = Instantiate(wallPrefab, position, rotation, boardParent);
         wall.name = wallName;
         Debug.Log($"{wallName} creada en: {position}");
+    }
+
+    // Método para colocar los marcadores (víctimas)
+    void PlaceMarker(AgentData agent, int fila, int columna)
+    {
+        float markerHeight = 7.3f; // Altura del marcador
+
+        // Calculamos la posición central de la celda
+        float x = columna * cellSize;
+        float z = -fila * cellSize;
+        Vector3 markerPosition = new Vector3(x, markerHeight, z);
+
+        // Seleccionar el prefab según el marker_type
+        GameObject markerPrefab = null;
+        if (agent.marker_type == "f")
+        {
+            markerPrefab = fMarkerPrefab;
+        }
+        else if (agent.marker_type == "v")
+        {
+            markerPrefab = vMarkerPrefab;
+        }
+        else
+        {
+            Debug.LogWarning($"Tipo de marcador desconocido: {agent.marker_type} en posición ({fila}, {columna})");
+            return;
+        }
+
+        // Instanciar el marcador
+        GameObject marker = Instantiate(markerPrefab, markerPosition, Quaternion.identity, boardParent);
+        marker.name = $"Marker_{agent.unique_id}";
+        Debug.Log($"Marcador '{agent.marker_type}' instanciado en: {markerPosition}");
     }
 }
