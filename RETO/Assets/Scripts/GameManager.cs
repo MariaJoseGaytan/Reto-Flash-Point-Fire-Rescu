@@ -270,7 +270,7 @@ public class GameManager : MonoBehaviour
     // Método para colocar los marcadores (víctimas)
     void PlaceMarker(AgentData agent, int fila, int columna)
     {
-        float markerHeight = 7.3f; // Altura del marcador
+        float markerHeight = -1.624f; // Altura del marcador
 
         // Calculamos la posición central de la celda
         float x = columna * cellSize;
