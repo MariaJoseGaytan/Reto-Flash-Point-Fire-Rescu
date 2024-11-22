@@ -7,22 +7,18 @@ public class GameManager : MonoBehaviour
     public ServerManager serverManager;
 
     // Referencias a los prefabs
-    public GameObject cellPrefab;         // Prefab del suelo
-    public GameObject wallPrefab;         // Prefab de las paredes
-    public GameObject doorPrefab;         // Prefab de las puertas
-    public GameObject fMarkerPrefab;      // Prefab para marker_type "f"
-    public GameObject vMarkerPrefab;      // Prefab para marker_type "v"
-    public GameObject fireMarkerPrefab;   // Prefab para FireMarkerAgent
+    public GameObject cellPrefab;      // Prefab del suelo
+    public GameObject wallPrefab;      // Prefab de las paredes
+    public GameObject fMarkerPrefab;   // Prefab para marker_type "f"
+    public GameObject vMarkerPrefab;   // Prefab para marker_type "v"
+    public GameObject fireMarkerPrefab; // Prefab para FireMarkerAgent
+    public GameObject doorPrefab;      // Prefab para las puertas
 
     // Padre para organizar las celdas
     public Transform boardParent;
 
     // Tamaño de la celda (escala del prefab)
     private float cellSize = 19.96322f;
-
-    // Diccionarios para almacenar datos de celdas y puertas
-    private Dictionary<(int, int), AgentData> cellAgentsDict = new Dictionary<(int, int), AgentData>();
-    private HashSet<string> processedDoors = new HashSet<string>();
 
     void Start()
     {
@@ -50,41 +46,6 @@ public class GameManager : MonoBehaviour
 
     void BuildBoard(List<CellState> gameState)
     {
-        cellAgentsDict.Clear();
-        processedDoors.Clear();
-
-        // Primero, almacenar los CellAgents en el diccionario
-        foreach (CellState cell in gameState)
-        {
-            int fila = cell.cell_position[0];
-            int columna = cell.cell_position[1];
-
-            foreach (AgentData agent in cell.agents)
-            {
-                if (agent.type == "CellAgent")
-                {
-                    cellAgentsDict[(fila, columna)] = agent;
-                    break;
-                }
-            }
-        }
-
-        // Procesar las puertas y actualizar las paredes
-        foreach (CellState cell in gameState)
-        {
-            int fila = cell.cell_position[0];
-            int columna = cell.cell_position[1];
-
-            foreach (AgentData agent in cell.agents)
-            {
-                if (agent.type == "DoorAgent")
-                {
-                    ProcessDoor(agent, fila, columna);
-                }
-            }
-        }
-
-        // Construir el tablero
         foreach (CellState cell in gameState)
         {
             int fila = cell.cell_position[0];
@@ -98,11 +59,12 @@ public class GameManager : MonoBehaviour
             Instantiate(cellPrefab, cellPosition, Quaternion.identity, boardParent);
             Debug.Log($"Celda creada en fila: {fila}, columna: {columna}, posición: {cellPosition}");
 
-            // Crear las paredes y colocar agentes
+            // Crear las paredes basándose en las celdas y agentes
             foreach (AgentData agent in cell.agents)
             {
                 if (agent.type == "CellAgent")
                 {
+                    ValidateDoors(agent, cell); // Validar puertas y ajustar paredes
                     CreateWalls(agent, fila, columna); // Evaluar paredes
                 }
                 else if (agent.type == "MarkerAgent")
@@ -117,128 +79,64 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // Método para procesar las puertas
-    void ProcessDoor(AgentData agent, int fila, int columna)
+    void ValidateDoors(AgentData cellAgent, CellState cell)
     {
-        int connectedFila = agent.connected_cell[0];
-        int connectedColumna = agent.connected_cell[1];
-
-        // Crear una clave única para la puerta
-        string doorKey = CreateDoorKey(fila, columna, connectedFila, connectedColumna);
-
-        // Verificar si ya hemos procesado esta puerta
-        if (processedDoors.Contains(doorKey))
+        foreach (AgentData agent in cell.agents)
         {
-            // Puerta ya procesada, omitir
-            return;
+            // Verifica que sea un DoorAgent y tenga una celda conectada
+            if (agent.type == "DoorAgent" && agent.connected_cell != null)
+            {
+                List<int> currentPosition = cell.cell_position;  // Posición actual de la celda
+                List<int> connectedPosition = agent.connected_cell; // Posición de la celda conectada
+
+                char[] walls = cellAgent.walls.ToCharArray(); // Obtener las paredes actuales como un arreglo de caracteres
+
+                // Determinar la ubicación de la puerta según las diferencias en x (fila) y y (columna)
+                int dx = connectedPosition[0] - currentPosition[0]; // Cambio en x (fila)
+                int dy = connectedPosition[1] - currentPosition[1]; // Cambio en y (columna)
+
+                string direction = ""; // Variable para almacenar la dirección detectada
+
+                // Ajustar las direcciones según tu lógica corregida
+                if (dx == 1 && dy == 0) // Puerta a la derecha
+                {
+                    walls[3] = '2';
+                    direction = "derecha";
+                }
+                else if (dx == -1 && dy == 0) // Puerta a la izquierda
+                {
+                    walls[1] = '2';
+                    direction = "izquierda";
+                }
+                else if (dx == 0 && dy == 1) // Puerta arriba
+                {
+                    walls[0] = '2';
+                    direction = "arriba";
+                }
+                else if (dx == 0 && dy == -1) // Puerta abajo
+                {
+                    walls[2] = '2';
+                    direction = "abajo";
+                }
+
+                // Log para depuración
+                Debug.Log($"[PUERTA DETECTADA] Dirección: {direction}, Pared actualizada: {new string(walls)}");
+                Debug.Log($"[DETALLES] Posición actual (x, y): ({currentPosition[0]}, {currentPosition[1]}), Conectada (x, y): ({connectedPosition[0]}, {connectedPosition[1]})");
+                Debug.Log($"[DIFERENCIA] dx: {dx}, dy: {dy}");
+
+                // Actualiza las paredes en el agente de celda
+                cellAgent.walls = new string(walls);
+            }
         }
-
-        // Marcar la puerta como procesada
-        processedDoors.Add(doorKey);
-
-        // Instanciar la puerta
-        InstantiateDoor(fila, columna, connectedFila, connectedColumna);
     }
 
-    // Método para crear una clave única para cada puerta
-    string CreateDoorKey(int fila1, int columna1, int fila2, int columna2)
-    {
-        // Ordenar las posiciones para asegurar que la clave sea única sin importar el orden
-        if (fila1 < fila2 || (fila1 == fila2 && columna1 < columna2))
-        {
-            return $"{fila1}_{columna1}_{fila2}_{columna2}";
-        }
-        else
-        {
-            return $"{fila2}_{columna2}_{fila1}_{columna1}";
-        }
-    }
-
-    // Método para instanciar la puerta en el lugar correcto
-    void InstantiateDoor(int fila, int columna, int connectedFila, int connectedColumna)
-    {
-        float doorHeight = -1f; // Altura de la puerta
-
-        // Desplazamientos basados en cálculos
-        float offsetX_ParedArriba = 6.8f;
-        float offsetX_ParedAbajo = 9.16322f;
-        float offsetX_ParedIzquierda = -2.2f;
-        float offsetX_ParedDerecha = -1.8f;
-
-        float offsetZ_ParedArriba = -2.8f;
-        float offsetZ_ParedIzquierda = 7.2f;
-        float offsetZ_ParedAbajo = -2.8f;
-        float offsetZ_ParedDerecha = -11f;
-
-        int filaDiff = connectedFila - fila;
-        int columnaDiff = connectedColumna - columna;
-
-        Vector3 position = Vector3.zero;
-        Quaternion rotation = Quaternion.identity;
-
-        // Determinar posición y rotación según la dirección de conexión
-        if (filaDiff == -1 && columnaDiff == 0)
-        {
-            // Puerta en la pared superior
-            float x = columna * cellSize + offsetX_ParedArriba;
-            float z = -fila * cellSize + offsetZ_ParedArriba;
-            position = new Vector3(x, doorHeight, z);
-            rotation = Quaternion.Euler(0, 0, 0);
-        }
-        else if (filaDiff == 1 && columnaDiff == 0)
-        {
-            // Puerta en la pared inferior
-            float x = columna * cellSize + offsetX_ParedAbajo;
-            float z = -fila * cellSize + offsetZ_ParedAbajo;
-            position = new Vector3(x, doorHeight, z);
-            rotation = Quaternion.Euler(0, 0, 0);
-        }
-        else if (filaDiff == 0 && columnaDiff == -1)
-        {
-            // Puerta en la pared izquierda
-            float x = columna * cellSize + offsetX_ParedIzquierda;
-            float z = -fila * cellSize + offsetZ_ParedIzquierda;
-            position = new Vector3(x, doorHeight, z);
-            rotation = Quaternion.Euler(0, 90, 0);
-        }
-        else if (filaDiff == 0 && columnaDiff == 1)
-        {
-            // Puerta en la pared derecha
-            float x = columna * cellSize + offsetX_ParedDerecha;
-            float z = -fila * cellSize + offsetZ_ParedDerecha;
-            position = new Vector3(x, doorHeight, z);
-            rotation = Quaternion.Euler(0, 90, 0);
-        }
-        else
-        {
-            Debug.LogWarning($"[DEBUG] Dirección de la puerta no reconocida entre ({fila}, {columna}) y ({connectedFila}, {connectedColumna})");
-            return;
-        }
-
-        // Instanciar la puerta
-        GameObject door = Instantiate(doorPrefab, position, rotation, boardParent);
-        door.name = $"Door_{fila}_{columna}_to_{connectedFila}_{connectedColumna}";
-        Debug.Log($"Puerta instanciada entre ({fila}, {columna}) y ({connectedFila}, {connectedColumna}) en posición {position}");
-    }
-
-    // Método para obtener el AgentData de una celda específica
-    AgentData GetCellAgent(int fila, int columna)
-    {
-        if (cellAgentsDict.TryGetValue((fila, columna), out AgentData agent))
-        {
-            return agent;
-        }
-        else
-        {
-            return null;
-        }
-    }
 
     void CreateWalls(AgentData agent, int fila, int columna)
     {
         float wallHeight = 7.1f; // Altura de las paredes
+        float cellSize = 19.96322f;
 
-        // Desplazamientos basados en cálculos
+        // Desplazamientos iniciales basados en cálculos
         float offsetX_ParedArriba = 6.8f;
         float offsetX_ParedAbajo = 9.16322f;
         float offsetX_ParedIzquierda = -2.2f;
@@ -253,7 +151,7 @@ public class GameManager : MonoBehaviour
         char[] walls = agent.walls.ToCharArray();
 
         // Variables temporales para la modificación de paredes
-        int filaMod = columna;
+        int filaMod = columna;     
         int columnaMod = fila;
 
         // Ajustar paredes si la celda es una entrada
@@ -283,43 +181,75 @@ public class GameManager : MonoBehaviour
 
         Debug.Log($"[DEBUG] Paredes ajustadas para celda en fila: {fila}, columna: {columna}, resultado: {new string(walls)}");
 
-        // Crear las paredes basándose en las paredes ajustadas
+        // Usar las paredes ajustadas para crear las paredes
+        // Aquí utilizamos las variables originales de fila y columna
+
+        // Pared superior
         if (walls[0] == '1')
         {
-            // Pared superior
             float x = offsetX_ParedArriba + columna * cellSize;
             float z = offsetZ_ParedArriba - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             InstantiateWall(position, Quaternion.identity, "Pared superior");
         }
+        else if (walls[0] == '2') // Puerta superior
+        {
+            float x = offsetX_ParedArriba + columna * cellSize;
+            float z = offsetZ_ParedArriba - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            InstantiateDoor(position, Quaternion.identity, "Puerta superior");
+        }
 
+        // Pared izquierda
         if (walls[1] == '1')
         {
-            // Pared izquierda
             float x = offsetX_ParedIzquierda + columna * cellSize;
             float z = offsetZ_ParedIzquierda - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             Quaternion rotation = Quaternion.Euler(0, 90, 0);
             InstantiateWall(position, rotation, "Pared izquierda");
         }
+        else if (walls[1] == '2') // Puerta izquierda
+        {
+            float x = offsetX_ParedIzquierda + columna * cellSize;
+            float z = offsetZ_ParedIzquierda - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            Quaternion rotation = Quaternion.Euler(0, 90, 0);
+            InstantiateDoor(position, rotation, "Puerta izquierda");
+        }
 
+        // Pared inferior
         if (walls[2] == '1')
         {
-            // Pared inferior
             float x = offsetX_ParedAbajo + (columna - 1) * cellSize;
             float z = offsetZ_ParedAbajo - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             InstantiateWall(position, Quaternion.identity, "Pared inferior");
         }
+        else if (walls[2] == '2') // Puerta inferior
+        {
+            float x = offsetX_ParedAbajo + (columna - 1) * cellSize;
+            float z = offsetZ_ParedAbajo - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            InstantiateDoor(position, Quaternion.identity, "Puerta inferior");
+        }
 
+        // Pared derecha
         if (walls[3] == '1')
         {
-            // Pared derecha
             float x = offsetX_ParedDerecha + columna * cellSize;
             float z = offsetZ_ParedDerecha - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             Quaternion rotation = Quaternion.Euler(0, 90, 0);
             InstantiateWall(position, rotation, "Pared derecha");
+        }
+        else if (walls[3] == '2') // Puerta derecha
+        {
+            float x = offsetX_ParedDerecha + columna * cellSize;
+            float z = offsetZ_ParedDerecha - fila * cellSize;
+            Vector3 position = new Vector3(x, wallHeight, z);
+            Quaternion rotation = Quaternion.Euler(0, 90, 0);
+            InstantiateDoor(position, rotation, "Puerta derecha");
         }
     }
 
@@ -328,6 +258,13 @@ public class GameManager : MonoBehaviour
         GameObject wall = Instantiate(wallPrefab, position, rotation, boardParent);
         wall.name = wallName;
         Debug.Log($"{wallName} creada en: {position}");
+    }
+
+    void InstantiateDoor(Vector3 position, Quaternion rotation, string doorName)
+    {
+        GameObject door = Instantiate(doorPrefab, position, rotation, boardParent);
+        door.name = doorName;
+        Debug.Log($"{doorName} creada en: {position}");
     }
 
     // Método para colocar los marcadores (víctimas)
