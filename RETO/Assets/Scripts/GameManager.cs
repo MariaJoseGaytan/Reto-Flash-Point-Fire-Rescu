@@ -8,14 +8,14 @@ public class GameManager : MonoBehaviour
     public ServerManager serverManager;
 
     // Referencias a los prefabs
-    public GameObject cellPrefab;      // Prefab del suelo
-    public GameObject wallPrefab;      // Prefab de las paredes
-    public GameObject fMarkerPrefab;   // Prefab para marker_type "f"
-    public GameObject vMarkerPrefab;   // Prefab para marker_type "v"
-    public GameObject fireMarkerPrefab; // Prefab para FireMarkerAgent
-    public GameObject smokeMarkerPrefab; // Prefab para SmokeMarkerAgent
-    public GameObject doorPrefab;      // Prefab para las puertas
-    public GameObject penguinPrefab;   // Prefab del pingüino
+    public GameObject cellPrefab;          // Prefab del suelo
+    public GameObject wallPrefab;          // Prefab de las paredes
+    public GameObject fMarkerPrefab;       // Prefab para marker_type "f" y "false_alarm"
+    public GameObject vMarkerPrefab;       // Prefab para marker_type "v" y "victim"
+    public GameObject fireMarkerPrefab;    // Prefab para FireMarkerAgent
+    public GameObject smokeMarkerPrefab;   // Prefab para SmokeMarkerAgent
+    public GameObject doorPrefab;          // Prefab para las puertas
+    public GameObject penguinPrefab;       // Prefab del pingüino
 
     // Padre para organizar las celdas
     public Transform boardParent;
@@ -46,6 +46,12 @@ public class GameManager : MonoBehaviour
 
     // Conjunto para rastrear las posiciones actuales de humo
     private HashSet<string> currentSmokePositions = new HashSet<string>();
+
+    // Diccionario para rastrear los marcadores de POIs
+    private Dictionary<string, GameObject> poiMarkers = new Dictionary<string, GameObject>();
+
+    // Conjunto para rastrear las posiciones actuales de POIs
+    private HashSet<string> currentPoiPositions = new HashSet<string>();
 
     void Start()
     {
@@ -96,7 +102,7 @@ public class GameManager : MonoBehaviour
                 }
                 else if (agent.type == "MarkerAgent")
                 {
-                    PlaceMarker(agent, fila, columna); // Colocar marcador
+                    //PlaceMarker(agent, fila, columna); // Colocar marcador
                 }
             }
         }
@@ -537,6 +543,65 @@ public class GameManager : MonoBehaviour
                 currentSmokePositions = newSmokePositions;
             }
         }
+
+        // Actualizar los marcadores de POIs
+        if (currentGameState.pois != null)
+        {
+            var poiStepData = currentGameState.pois.FirstOrDefault(p => p.step == step);
+            if (poiStepData != null && poiStepData.data != null)
+            {
+                HashSet<string> newPoiPositions = new HashSet<string>();
+
+                foreach (var poiData in poiStepData.data)
+                {
+                    int[] position = poiData.position;
+
+                    // Restar 1 a cada coordenada y **intercambiarlas**
+                    int adjustedRow = position[1] - 1;
+                    int adjustedColumn = position[0] - 1;
+
+                    // Crear una clave única para esta posición y tipo
+                    string positionKey = $"{adjustedRow}_{adjustedColumn}_{poiData.type}";
+
+                    newPoiPositions.Add(positionKey);
+
+                    // Si no existe ya un marcador de POI en esta posición y tipo, instanciarlo
+                    if (!currentPoiPositions.Contains(positionKey))
+                    {
+                        Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
+                        PlacePoiMarkerAtPosition(worldPosition, positionKey, poiData.type);
+                    }
+                }
+
+                // Encontrar marcadores de POIs que ya no existen y eliminarlos
+                foreach (var positionKey in currentPoiPositions)
+                {
+                    if (!newPoiPositions.Contains(positionKey))
+                    {
+                        if (poiMarkers.ContainsKey(positionKey))
+                        {
+                            GameObject marker = poiMarkers[positionKey];
+                            Destroy(marker);
+                            poiMarkers.Remove(positionKey);
+                            Debug.Log($"Marcador de POI eliminado en posición {positionKey}");
+                        }
+                    }
+                }
+
+                // Actualizar el conjunto de posiciones actuales de POIs
+                currentPoiPositions = newPoiPositions;
+            }
+            else
+            {
+                // Si no hay datos para este paso, eliminar todos los marcadores de POIs existentes
+                foreach (var marker in poiMarkers.Values)
+                {
+                    Destroy(marker);
+                }
+                poiMarkers.Clear();
+                currentPoiPositions.Clear();
+            }
+        }
     }
 
     void PlaceFireMarkerAtPosition(Vector3 worldPosition, string positionKey)
@@ -561,6 +626,33 @@ public class GameManager : MonoBehaviour
 
         smokeMarkers[positionKey] = marker;
         Debug.Log($"Marcador de humo instanciado en: {markerPosition} para posición {positionKey}");
+    }
+
+    void PlacePoiMarkerAtPosition(Vector3 worldPosition, string positionKey, string poiType)
+    {
+        float markerHeight = -1.624f; // Altura del marcador de POI
+        Vector3 markerPosition = new Vector3(worldPosition.x, markerHeight, worldPosition.z);
+
+        GameObject markerPrefab = null;
+        if (poiType == "false_alarm")
+        {
+            markerPrefab = fMarkerPrefab;
+        }
+        else if (poiType == "victim")
+        {
+            markerPrefab = vMarkerPrefab;
+        }
+        else
+        {
+            Debug.LogWarning($"Tipo de POI desconocido: {poiType} en posición {positionKey}");
+            return;
+        }
+
+        GameObject marker = Instantiate(markerPrefab, markerPosition, Quaternion.identity, boardParent);
+        marker.name = $"PoiMarker_{positionKey}";
+
+        poiMarkers[positionKey] = marker;
+        Debug.Log($"Marcador de POI '{poiType}' instanciado en: {markerPosition} para posición {positionKey}");
     }
 
     // Método para convertir las coordenadas de la cuadrícula a posiciones en el mundo
