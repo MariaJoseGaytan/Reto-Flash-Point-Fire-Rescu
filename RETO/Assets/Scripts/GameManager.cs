@@ -26,32 +26,17 @@ public class GameManager : MonoBehaviour
     // Variable para almacenar el estado actual del juego
     public MapData currentGameState;
 
-    // Diccionario para rastrear los pingüinos instanciados
+    // Diccionarios y conjuntos para rastrear objetos instanciados y sus posiciones
     private Dictionary<int, GameObject> penguinGameObjects = new Dictionary<int, GameObject>();
-
-    // Diccionario para rastrear las paredes instanciadas
     private Dictionary<string, GameObject> wallGameObjects = new Dictionary<string, GameObject>();
-
-    // Diccionario para rastrear las posiciones de las paredes
     private Dictionary<string, GameObject> wallPositions = new Dictionary<string, GameObject>();
-
-    // Diccionario para rastrear los marcadores de fuego
     private Dictionary<string, GameObject> fireMarkers = new Dictionary<string, GameObject>();
-
-    // Conjunto para rastrear las posiciones actuales de fuego
     private HashSet<string> currentFirePositions = new HashSet<string>();
-
-    // Diccionario para rastrear los marcadores de humo
     private Dictionary<string, GameObject> smokeMarkers = new Dictionary<string, GameObject>();
-
-    // Conjunto para rastrear las posiciones actuales de humo
     private HashSet<string> currentSmokePositions = new HashSet<string>();
-
-    // Diccionario para rastrear los marcadores de POIs
     private Dictionary<string, GameObject> poiMarkers = new Dictionary<string, GameObject>();
-
-    // Conjunto para rastrear las posiciones actuales de POIs
     private HashSet<string> currentPoiPositions = new HashSet<string>();
+    private HashSet<string> processedDoors = new HashSet<string>();
 
     void Start()
     {
@@ -79,6 +64,12 @@ public class GameManager : MonoBehaviour
 
     void BuildBoard(List<CellState> gameState)
     {
+        // Crear un diccionario para mapear las posiciones de las celdas a sus CellState
+        Dictionary<(int, int), CellState> cellDictionary = gameState.ToDictionary(
+            cell => (cell.cell_position[0], cell.cell_position[1]),
+            cell => cell
+        );
+
         foreach (CellState cell in gameState)
         {
             int fila = cell.cell_position[0];
@@ -97,72 +88,130 @@ public class GameManager : MonoBehaviour
             {
                 if (agent.type == "CellAgent")
                 {
-                    ValidateDoors(agent, cell); // Validar puertas y ajustar paredes
+                    ValidateDoors(agent, cell, cellDictionary); // Validar puertas y ajustar paredes
                     CreateWalls(agent, fila, columna); // Evaluar paredes
                 }
                 else if (agent.type == "MarkerAgent")
                 {
-                    //PlaceMarker(agent, fila, columna); // Colocar marcador
+                    // Si deseas crear marcadores iniciales, descomenta la siguiente línea
+                    // PlaceMarker(agent, fila, columna); // Colocar marcador
                 }
             }
         }
     }
 
-    void ValidateDoors(AgentData cellAgent, CellState cell)
+    void ValidateDoors(AgentData cellAgent, CellState cell, Dictionary<(int, int), CellState> cellDictionary)
     {
         foreach (AgentData agent in cell.agents)
         {
-            // Verifica que sea un DoorAgent y tenga una celda conectada
             if (agent.type == "DoorAgent" && agent.connected_cell != null)
             {
-                List<int> currentPosition = cell.cell_position;  // Posición actual de la celda
-                List<int> connectedPosition = agent.connected_cell; // Posición de la celda conectada
+                List<int> currentPosition = cell.cell_position;
+                List<int> connectedPosition = agent.connected_cell;
 
-                char[] walls = cellAgent.walls.ToCharArray(); // Obtener las paredes actuales como un arreglo de caracteres
+                string doorKey = GetDoorKey(currentPosition, connectedPosition);
 
-                // Determinar la ubicación de la puerta según las diferencias en x (fila) y y (columna)
-                int dx = connectedPosition[0] - currentPosition[0]; // Cambio en x (fila)
-                int dy = connectedPosition[1] - currentPosition[1]; // Cambio en y (columna)
-
-                string direction = ""; // Variable para almacenar la dirección detectada
-
-                // Ajustar las direcciones según tu lógica corregida
-                if (dx == 1 && dy == 0) // Puerta a la derecha
+                if (processedDoors.Contains(doorKey))
                 {
-                    walls[3] = '2';
-                    direction = "derecha";
+                    continue;
                 }
-                else if (dx == -1 && dy == 0) // Puerta a la izquierda
-                {
-                    walls[1] = '2';
-                    direction = "izquierda";
-                }
-                else if (dx == 0 && dy == 1) // Puerta arriba
-                {
-                    walls[0] = '2';
-                    direction = "arriba";
-                }
-                else if (dx == 0 && dy == -1) // Puerta abajo
-                {
-                    walls[2] = '2';
-                    direction = "abajo";
-                }
+                processedDoors.Add(doorKey);
 
-                // Log para depuración
-                Debug.Log($"[PUERTA DETECTADA] Dirección: {direction}, Pared actualizada: {new string(walls)}");
-                Debug.Log($"[DETALLES] Posición actual (x, y): ({currentPosition[0]}, {currentPosition[1]}), Conectada (x, y): ({connectedPosition[0]}, {connectedPosition[1]})");
-                Debug.Log($"[DIFERENCIA] dx: {dx}, dy: {dy}");
+                string direction = GetDirectionBetweenCells(currentPosition.ToArray(), connectedPosition.ToArray());
+                int wallIndex = GetWallIndex(direction);
 
-                // Actualiza las paredes en el agente de celda
+                // Actualizar paredes en la celda actual
+                char[] walls = cellAgent.walls.ToCharArray();
+                walls[wallIndex] = '2';
                 cellAgent.walls = new string(walls);
+
+                // Actualizar paredes en la celda conectada
+                if (cellDictionary.TryGetValue((connectedPosition[0], connectedPosition[1]), out CellState connectedCell))
+                {
+                    AgentData connectedCellAgent = connectedCell.agents.FirstOrDefault(a => a.type == "CellAgent");
+                    if (connectedCellAgent != null)
+                    {
+                        char[] connectedWalls = connectedCellAgent.walls.ToCharArray();
+                        int oppositeWallIndex = GetOppositeWallIndex(wallIndex);
+                        connectedWalls[oppositeWallIndex] = '2'; // Marcar como puerta
+                        connectedCellAgent.walls = new string(connectedWalls);
+                        Debug.Log($"[PUERTA EN CELDA CONECTADA] Pared actualizada en celda conectada ({connectedPosition[0]}, {connectedPosition[1]}): {new string(connectedWalls)}");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"No se encontró la celda conectada en posición ({connectedPosition[0]}, {connectedPosition[1]})");
+                }
             }
         }
+    }
+
+    string GetDirectionBetweenCells(int[] cell1, int[] cell2)
+    {
+        int dx = cell2[0] - cell1[0];
+        int dy = cell2[1] - cell1[1];
+
+        if (dx == 1 && dy == 0)
+            return "right";
+        else if (dx == -1 && dy == 0)
+            return "left";
+        else if (dx == 0 && dy == 1)
+            return "up";
+        else if (dx == 0 && dy == -1)
+            return "down";
+        else
+            return null;
+    }
+
+    int GetWallIndex(string direction)
+    {
+        switch (direction)
+        {
+            case "up": return 0;
+            case "left": return 1;
+            case "down": return 2;
+            case "right": return 3;
+            default: return -1;
+        }
+    }
+
+    int GetOppositeWallIndex(int index)
+    {
+        switch (index)
+        {
+            case 0: return 2; // up -> down
+            case 1: return 3; // left -> right
+            case 2: return 0; // down -> up
+            case 3: return 1; // right -> left
+            default: return -1;
+        }
+    }
+
+    string GetDoorKey(List<int> cell1, List<int> cell2)
+    {
+        // Ordenamos las celdas para que la clave sea consistente sin importar el orden
+        int cell1X = cell1[0];
+        int cell1Y = cell1[1];
+        int cell2X = cell2[0];
+        int cell2Y = cell2[1];
+
+        if (cell1X > cell2X || (cell1X == cell2X && cell1Y > cell2Y))
+        {
+            // Intercambiamos si cell1 es mayor que cell2
+            int tempX = cell1X;
+            int tempY = cell1Y;
+            cell1X = cell2X;
+            cell1Y = cell2Y;
+            cell2X = tempX;
+            cell2Y = tempY;
+        }
+
+        return $"{cell1X}_{cell1Y}_{cell2X}_{cell2Y}";
     }
 
     void CreateWalls(AgentData agent, int fila, int columna)
     {
         float wallHeight = 7.1f; // Altura de las paredes
-        float cellSize = 19.96322f;
 
         // Desplazamientos iniciales basados en cálculos
         float offsetX_ParedArriba = 6.8f;
@@ -312,7 +361,7 @@ public class GameManager : MonoBehaviour
         string positionKey = GetWallPositionKey(position);
         if (wallPositions.ContainsKey(positionKey))
         {
-            // Ya existe una pared en esta posición, no instanciar la nueva puerta
+            // Ya existe una pared o puerta en esta posición, no instanciar la nueva puerta
             Debug.Log($"Ya existe una pared en la posición {position}. No se instanciará {doorName}.");
             return;
         }
@@ -428,7 +477,7 @@ public class GameManager : MonoBehaviour
                     // Generar la clave de la pared utilizando las mismas variables que al crearla
                     string wallKey = GetWallKey(fila, columna, direction);
 
-                    Debug.Log($"[DESTRUCCIÓN] wallKey: {wallKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
+                    Debug.Log($"[DESTRUCCIÓN PARED] wallKey: {wallKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
 
                     if (wallGameObjects.ContainsKey(wallKey))
                     {
@@ -446,7 +495,89 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        // Procesar puertas destruidas
+        if (currentGameState.destroyed_doors != null)
+        {
+            var destroyedDoorsStep = currentGameState.destroyed_doors.FirstOrDefault(dd => dd.step == step);
+            if (destroyedDoorsStep != null && destroyedDoorsStep.data != null)
+            {
+                foreach (var destroyedDoor in destroyedDoorsStep.data)
+                {
+                    int[] cell1 = destroyedDoor.cell1;
+                    int[] cell2 = destroyedDoor.cell2;
+                    string direction = GetDirectionBetweenCells(cell1, cell2);
+
+                    int fila = cell1[0];
+                    int columna = cell1[1];
+
+                    string doorKey = GetWallKey(fila, columna, direction);
+
+                    Debug.Log($"[DESTRUCCIÓN PUERTA] doorKey: {doorKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
+
+                    if (wallGameObjects.ContainsKey(doorKey))
+                    {
+                        // Eliminar la puerta del diccionario y destruir el GameObject
+                        GameObject door = wallGameObjects[doorKey];
+                        Destroy(door);
+                        wallGameObjects.Remove(doorKey);
+                        Debug.Log($"Puerta destruida entre celdas ({cell1[0]}, {cell1[1]}) y ({cell2[0]}, {cell2[1]}) dirección {direction}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"No se encontró la puerta entre celdas ({cell1[0]}, {cell1[1]}) y ({cell2[0]}, {cell2[1]}) dirección {direction} para destruir.");
+                    }
+                }
+            }
+        }
+
+        // Procesar puertas abiertas (también las destruimos)
+        if (currentGameState.open_doors != null)
+        {
+            var openDoorsStep = currentGameState.open_doors.FirstOrDefault(od => od.step == step);
+            if (openDoorsStep != null && openDoorsStep.data != null)
+            {
+                foreach (var doorPair in openDoorsStep.data)
+                {
+                    int[] cell1 = doorPair[0];
+                    int[] cell2 = doorPair[1];
+
+                    string direction = GetDirectionBetweenCells(cell1, cell2);
+
+                    int fila = cell1[0];
+                    int columna = cell1[1];
+
+                    string doorKey = GetWallKey(fila, columna, direction);
+
+                    Debug.Log($"[PUERTA ABIERTA] doorKey: {doorKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
+
+                    if (wallGameObjects.ContainsKey(doorKey))
+                    {
+                        // Eliminar la puerta del diccionario y destruir el GameObject
+                        GameObject door = wallGameObjects[doorKey];
+                        Destroy(door);
+                        wallGameObjects.Remove(doorKey);
+                        Debug.Log($"Puerta abierta y destruida entre celdas ({cell1[0]}, {cell1[1]}) y ({cell2[0]}, {cell2[1]}) dirección {direction}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"No se encontró la puerta entre celdas ({cell1[0]}, {cell1[1]}) y ({cell2[0]}, {cell2[1]}) dirección {direction} para abrir/destruir.");
+                    }
+                }
+            }
+        }
+
         // Actualizar los marcadores de fuego
+        UpdateFireMarkers(step);
+
+        // Actualizar los marcadores de humo
+        UpdateSmokeMarkers(step);
+
+        // Actualizar los marcadores de POIs
+        UpdatePoiMarkers(step);
+    }
+
+    void UpdateFireMarkers(int step)
+    {
         if (currentGameState.fire_expansion != null)
         {
             var fireExpansionStep = currentGameState.fire_expansion.FirstOrDefault(f => f.step == step);
@@ -494,8 +625,10 @@ public class GameManager : MonoBehaviour
                 currentFirePositions = newFirePositions;
             }
         }
+    }
 
-        // Actualizar los marcadores de humo
+    void UpdateSmokeMarkers(int step)
+    {
         if (currentGameState.smoke_expansion != null)
         {
             var smokeExpansionStep = currentGameState.smoke_expansion.FirstOrDefault(s => s.step == step);
@@ -543,8 +676,10 @@ public class GameManager : MonoBehaviour
                 currentSmokePositions = newSmokePositions;
             }
         }
+    }
 
-        // Actualizar los marcadores de POIs
+    void UpdatePoiMarkers(int step)
+    {
         if (currentGameState.pois != null)
         {
             var poiStepData = currentGameState.pois.FirstOrDefault(p => p.step == step);
