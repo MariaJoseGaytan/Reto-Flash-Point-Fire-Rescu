@@ -221,8 +221,8 @@ public class StepManager : MonoBehaviour
         // Mostrar los contadores
         GUI.Label(new Rect(20, 20, 280, 25), $"Hielo Descongelado: {structuralDamage}", styleWhite);
         GUI.Label(new Rect(20, 50, 280, 25), $"Puffles Rescatadas: {rescuedPeople}", styleYellow);
-        GUI.Label(new Rect(20, 80, 280, 25), $"Puffles Muertas: {deadPeople}", styleRed);
-        GUI.Label(new Rect(20, 110, 280, 25), $"Pingüinos Muertos: {deadAgents}", styleRed);
+        GUI.Label(new Rect(20, 80, 280, 25), $"Puffles Perdidos: {deadPeople}", styleRed);
+        GUI.Label(new Rect(20, 110, 280, 25), $"Pingüinos Heridos: {deadAgents}", styleRed);
 
         // Mostrar el número de paso
         GUI.Label(new Rect(Screen.width / 2 - 100, 10, 200, 40), $"Paso: {currentStep}", styleStep);
