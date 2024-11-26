@@ -348,6 +348,52 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &498801997
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 498801999}
+  - component: {fileID: 498801998}
+  m_Layer: 0
+  m_Name: StepServer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &498801998
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 498801997}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7089c5543df04daf994cce791af8e88, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serverUrl: http://127.0.0.1:5001/
+  stepData: {fileID: 2105800413}
+--- !u!4 &498801999
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 498801997}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -83.42316, y: 39.25964, z: -63.499504}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1541153561
 GameObject:
   m_ObjectHideFlags: 0
@@ -612,7 +658,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   stepData: {fileID: 2105800413}
+  serverManager: {fileID: 2108433998}
   gameManager: {fileID: 1649286201}
+  debugStep: 0
 --- !u!4 &1974987911
 Transform:
   m_ObjectHideFlags: 0
@@ -791,3 +839,4 @@ SceneRoots:
   - {fileID: 1576871212}
   - {fileID: 1974987911}
   - {fileID: 2105800414}
+  - {fileID: 498801999}

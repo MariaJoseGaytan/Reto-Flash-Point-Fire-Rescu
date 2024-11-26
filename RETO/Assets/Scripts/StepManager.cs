@@ -23,8 +23,14 @@ public class StepManager : MonoBehaviour
     // Referencia a GameManager para actualizar el tablero
     public GameManager gameManager;
 
-    // Variable pública para modificar manualmente el paso desde el Inspector
-    public int debugStep = 0;
+    // Variable para indicar si los datos han sido cargados
+    private bool dataLoaded = false;
+
+    // Tiempo acumulado desde el último incremento de paso
+    private float timeSinceLastStep = 0f;
+
+    // Intervalo de tiempo entre pasos (10 segundos)
+    public float stepInterval = 10f;
 
     void Start()
     {
@@ -51,8 +57,16 @@ public class StepManager : MonoBehaviour
             {
                 totalSteps = stepData.mapData.agents.Length;
                 Debug.Log($"[SERVER] Número total de pasos cargados: {totalSteps}");
+
+                // Asegurarnos de que el currentStep inicial está en el rango válido
+                currentStep = Mathf.Clamp(currentStep, 0, totalSteps - 1);
+
+                // Actualizar los contadores y el tablero para el paso inicial
                 UpdateCounters();
                 UpdateBoard();
+
+                // Indicar que los datos han sido cargados
+                dataLoaded = true;
             }
             else
             {
@@ -65,65 +79,88 @@ public class StepManager : MonoBehaviour
         }
     }
 
-    void Update()
+   void Update()
+{
+    // Verifica que los datos estén cargados antes de continuar
+    if (!dataLoaded)
     {
-        // Sincronizar manualmente el paso con debugStep
-        if (debugStep != currentStep)
-        {
-            Debug.Log($"[UPDATE] Cambio detectado en debugStep. debugStep: {debugStep}, currentStep: {currentStep}");
-            currentStep = Mathf.Clamp(debugStep, 0, totalSteps - 1); // Asegura que debugStep esté en el rango válido
-            Debug.Log($"[UPDATE] Paso actualizado manualmente a: {currentStep}");
-            UpdateCounters();
-            UpdateBoard();
-        }
+        Debug.Log("[UPDATE] Los datos no han sido cargados.");
+        return;
     }
+
+    // Incrementar el tiempo transcurrido
+    timeSinceLastStep += Time.deltaTime;
+
+    // Mostrar log para depuración
+    Debug.Log($"[UPDATE] Tiempo acumulado: {timeSinceLastStep}/{stepInterval}, Paso actual: {currentStep}");
+
+    // Detectar y loggear cada segundo acumulado
+    int secondsElapsed = Mathf.FloorToInt(timeSinceLastStep);
+    if (secondsElapsed > 0 && timeSinceLastStep < stepInterval)
+    {
+        Debug.Log($"[TIMER] Han transcurrido {secondsElapsed} segundos del intervalo de {stepInterval}.");
+    }
+
+    // Verificar si el tiempo acumulado ha alcanzado el intervalo de paso
+    if (timeSinceLastStep >= stepInterval)
+    {
+        // Reiniciar el temporizador
+        timeSinceLastStep = 0f;
+
+        // Incrementar el paso actual
+        currentStep++;
+
+        // Verificar que el paso actual no exceda el total de pasos disponibles
+        if (currentStep >= totalSteps)
+        {
+            Debug.Log("[UPDATE] Se ha alcanzado el último paso. Deteniendo el avance.");
+            currentStep = totalSteps - 1;
+            return; // Salir para evitar avanzar más
+        }
+
+        // Actualizar contadores y tablero para el nuevo paso
+        Debug.Log($"[UPDATE] Cambiando al paso: {currentStep}");
+        UpdateCounters(); // Actualizar los contadores
+        UpdateBoard();    // Actualizar el tablero
+    }
+}
+
+
 
     private int GetStructuralDamageForStep(int step)
     {
         if (stepData.mapData.structuralDamageDict != null && stepData.mapData.structuralDamageDict.ContainsKey(step))
         {
-            int damage = stepData.mapData.structuralDamageDict[step].value;
-            Debug.Log($"[DATA] Daño estructural encontrado para el paso {step}: {damage}");
-            return damage;
+            return stepData.mapData.structuralDamageDict[step].value;
         }
-        Debug.LogWarning($"[DATA] No se encontró información de daño estructural para el paso {step}.");
-        return 0;
+        return 0; // Devuelve 0 si no hay datos para el paso
     }
 
     private int GetSavedLivesForStep(int step)
     {
         if (stepData.mapData.savedLifesDict != null && stepData.mapData.savedLifesDict.ContainsKey(step))
         {
-            int count = stepData.mapData.savedLifesDict[step].count;
-            Debug.Log($"[DATA] Vidas salvadas encontradas para el paso {step}: {count}");
-            return count;
+            return stepData.mapData.savedLifesDict[step].count;
         }
-        Debug.LogWarning($"[DATA] No se encontró información de vidas salvadas para el paso {step}.");
-        return 0;
+        return 0; // Devuelve 0 si no hay datos para el paso
     }
 
     private int GetVictimsDeadForStep(int step)
     {
         if (stepData.mapData.victimsDeadDict != null && stepData.mapData.victimsDeadDict.ContainsKey(step))
         {
-            int count = stepData.mapData.victimsDeadDict[step].count;
-            Debug.Log($"[DATA] Víctimas muertas encontradas para el paso {step}: {count}");
-            return count;
+            return stepData.mapData.victimsDeadDict[step].count;
         }
-        Debug.LogWarning($"[DATA] No se encontró información de víctimas muertas para el paso {step}.");
-        return 0;
+        return 0; // Devuelve 0 si no hay datos para el paso
     }
 
     private int GetAgentsDeadForStep(int step)
     {
         if (stepData.mapData.agentsDeadDict != null && stepData.mapData.agentsDeadDict.ContainsKey(step))
         {
-            int count = stepData.mapData.agentsDeadDict[step].count;
-            Debug.Log($"[DATA] Agentes muertos encontrados para el paso {step}: {count}");
-            return count;
+            return stepData.mapData.agentsDeadDict[step].count;
         }
-        Debug.LogWarning($"[DATA] No se encontró información de agentes muertos para el paso {step}.");
-        return 0;
+        return 0; // Devuelve 0 si no hay datos para el paso
     }
 
     void UpdateCounters()
@@ -131,16 +168,11 @@ public class StepManager : MonoBehaviour
         Debug.Log($"[COUNTERS] Actualizando contadores para el paso {currentStep}.");
 
         structuralDamage = GetStructuralDamageForStep(currentStep);
-        Debug.Log($"[COUNTERS] Daño estructural para el paso {currentStep}: {structuralDamage}");
-
         rescuedPeople = GetSavedLivesForStep(currentStep);
-        Debug.Log($"[COUNTERS] Personas rescatadas para el paso {currentStep}: {rescuedPeople}");
-
         deadPeople = GetVictimsDeadForStep(currentStep);
-        Debug.Log($"[COUNTERS] Personas muertas para el paso {currentStep}: {deadPeople}");
-
         deadAgents = GetAgentsDeadForStep(currentStep);
-        Debug.Log($"[COUNTERS] Agentes muertos para el paso {currentStep}: {deadAgents}");
+
+        Debug.Log($"[COUNTERS] Paso {currentStep}: Daño estructural = {structuralDamage}, Personas rescatadas = {rescuedPeople}, Personas muertas = {deadPeople}, Agentes muertos = {deadAgents}");
     }
 
     void UpdateBoard()
@@ -150,7 +182,6 @@ public class StepManager : MonoBehaviour
         if (gameManager != null)
         {
             gameManager.UpdateBoardState(currentStep);
-            Debug.Log($"[BOARD] Tablero actualizado para el paso {currentStep}.");
         }
         else
         {
@@ -173,7 +204,6 @@ public class StepManager : MonoBehaviour
         styleWhite.fontSize = 16;
         styleWhite.normal.textColor = Color.white;
 
-        // Estilo para el número de paso
         GUIStyle styleStep = new GUIStyle();
         styleStep.fontSize = 20;
         styleStep.normal.textColor = Color.cyan;
@@ -186,10 +216,10 @@ public class StepManager : MonoBehaviour
         GUI.color = originalColor;
 
         // Mostrar los contadores
-        GUI.Label(new Rect(20, 20, 280, 25), $"Daño Estructural: {structuralDamage}", styleWhite);
-        GUI.Label(new Rect(20, 50, 280, 25), $"Personas Rescatadas: {rescuedPeople}", styleYellow);
-        GUI.Label(new Rect(20, 80, 280, 25), $"Personas Muertas: {deadPeople}", styleRed);
-        GUI.Label(new Rect(20, 110, 280, 25), $"Agentes Muertos: {deadAgents}", styleRed);
+        GUI.Label(new Rect(20, 20, 280, 25), $"Hielo Descongelado: {structuralDamage}", styleWhite);
+        GUI.Label(new Rect(20, 50, 280, 25), $"Puffles Rescatadas: {rescuedPeople}", styleYellow);
+        GUI.Label(new Rect(20, 80, 280, 25), $"Puffles Muertas: {deadPeople}", styleRed);
+        GUI.Label(new Rect(20, 110, 280, 25), $"Pingüinos Muertos: {deadAgents}", styleRed);
 
         // Mostrar el número de paso
         GUI.Label(new Rect(Screen.width / 2 - 100, 10, 200, 40), $"Paso: {currentStep}", styleStep);
