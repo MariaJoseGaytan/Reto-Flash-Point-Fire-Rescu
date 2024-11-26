@@ -344,8 +344,11 @@ public void UpdateBoardState(int step)
     {
         int agentId = agentData.agent_id;
         int[] position = agentData.position;
-        // Intercambiar las coordenadas x e y
-        Vector3 worldPosition = ConvertGridPositionToWorldPosition(position[1], position[0]);
+
+        // Restar 1 a cada coordenada y luego intercambiarlas
+        int adjustedRow = position[1] - 1;
+        int adjustedColumn = position[0] - 1;
+        Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
 
         if (penguinGameObjects.ContainsKey(agentId))
         {
@@ -365,14 +368,16 @@ public void UpdateBoardState(int step)
     }
 }
 
-    // Método para convertir las coordenadas de la cuadrícula a posiciones en el mundo
-    private Vector3 ConvertGridPositionToWorldPosition(int row, int column)
-    {
-        float x = column * cellSize;
-        float z = -row * cellSize;
-        float y = 0; // Ajusta la altura si es necesario
-        return new Vector3(x, y, z);
-    }
+
+// Método para convertir las coordenadas de la cuadrícula a posiciones en el mundo
+private Vector3 ConvertGridPositionToWorldPosition(int row, int column)
+{
+    float x = column * cellSize;
+    float z = -row * cellSize;
+    float y = 0; // Ajusta la altura si es necesario
+    return new Vector3(x, y, z);
+}
+
 
     public void SetMapData(MapData mapData)
 {
