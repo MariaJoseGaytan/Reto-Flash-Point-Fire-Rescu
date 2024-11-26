@@ -5,6 +5,9 @@ public class StepManager : MonoBehaviour
     // Referencia al StepData para acceder a los datos deserializados
     public StepData stepData;
 
+    // Referencia al servidor para cargar los datos JSON
+    public ServerManager serverManager;
+
     // Variable para rastrear el paso actual
     private int currentStep = 0;
 
@@ -20,127 +23,138 @@ public class StepManager : MonoBehaviour
     // Referencia a GameManager para actualizar el tablero
     public GameManager gameManager;
 
+    // Variable pública para modificar manualmente el paso desde el Inspector
+    public int debugStep = 0;
+
     void Start()
     {
-        if (stepData != null && stepData.mapData != null)
+        if (serverManager != null)
         {
-            totalSteps = stepData.mapData.agents.Length; // Asumiendo que 'agents' define el número de pasos
-            UpdateCounters();
-            UpdateBoard();
+            Debug.Log("[START] Cargando datos desde el servidor...");
+            StartCoroutine(serverManager.GetGameState(OnGameStateReceived));
         }
         else
         {
-            Debug.LogError("StepData o MapData no está asignado o aún no se ha procesado.");
+            Debug.LogError("[START] ServerManager no está asignado en StepManager.");
+        }
+    }
+
+    // Callback para recibir el JSON desde el servidor
+    private void OnGameStateReceived(string json)
+    {
+        if (!string.IsNullOrEmpty(json))
+        {
+            Debug.Log("[SERVER] Datos recibidos desde el servidor.");
+            stepData.ProcessStepData(json); // Procesar y asignar el JSON a `StepData`
+
+            if (stepData.mapData != null && stepData.mapData.agents != null)
+            {
+                totalSteps = stepData.mapData.agents.Length;
+                Debug.Log($"[SERVER] Número total de pasos cargados: {totalSteps}");
+                UpdateCounters();
+                UpdateBoard();
+            }
+            else
+            {
+                Debug.LogError("[SERVER] El JSON procesado no contiene datos válidos.");
+            }
+        }
+        else
+        {
+            Debug.LogError("[SERVER] No se recibieron datos válidos desde el servidor.");
         }
     }
 
     void Update()
     {
-        // Avanzar al siguiente paso presionando la tecla "N"
-        if (Input.GetKeyDown(KeyCode.N))
+        // Sincronizar manualmente el paso con debugStep
+        if (debugStep != currentStep)
         {
-            AdvanceStep();
-        }
-
-        // Retroceder al paso anterior presionando la tecla "P"
-        if (Input.GetKeyDown(KeyCode.P))
-        {
-            PreviousStep();
-        }
-    }
-
-    // Método para avanzar al siguiente paso
-    public void AdvanceStep()
-    {
-        if (currentStep < totalSteps - 1)
-        {
-            currentStep++;
+            Debug.Log($"[UPDATE] Cambio detectado en debugStep. debugStep: {debugStep}, currentStep: {currentStep}");
+            currentStep = Mathf.Clamp(debugStep, 0, totalSteps - 1); // Asegura que debugStep esté en el rango válido
+            Debug.Log($"[UPDATE] Paso actualizado manualmente a: {currentStep}");
             UpdateCounters();
             UpdateBoard();
-            Debug.Log($"Paso avanzado a: {currentStep}");
-        }
-        else
-        {
-            Debug.Log("Has alcanzado el último paso.");
         }
     }
 
-    // Método para retroceder al paso anterior
-    public void PreviousStep()
+    private int GetStructuralDamageForStep(int step)
     {
-        if (currentStep > 0)
+        if (stepData.mapData.structuralDamageDict != null && stepData.mapData.structuralDamageDict.ContainsKey(step))
         {
-            currentStep--;
-            UpdateCounters();
-            UpdateBoard();
-            Debug.Log($"Paso retrocedido a: {currentStep}");
+            int damage = stepData.mapData.structuralDamageDict[step].value;
+            Debug.Log($"[DATA] Daño estructural encontrado para el paso {step}: {damage}");
+            return damage;
         }
-        else
-        {
-            Debug.Log("Estás en el primer paso.");
-        }
+        Debug.LogWarning($"[DATA] No se encontró información de daño estructural para el paso {step}.");
+        return 0;
     }
 
-    // Método para actualizar los contadores con los datos del paso actual
+    private int GetSavedLivesForStep(int step)
+    {
+        if (stepData.mapData.savedLifesDict != null && stepData.mapData.savedLifesDict.ContainsKey(step))
+        {
+            int count = stepData.mapData.savedLifesDict[step].count;
+            Debug.Log($"[DATA] Vidas salvadas encontradas para el paso {step}: {count}");
+            return count;
+        }
+        Debug.LogWarning($"[DATA] No se encontró información de vidas salvadas para el paso {step}.");
+        return 0;
+    }
+
+    private int GetVictimsDeadForStep(int step)
+    {
+        if (stepData.mapData.victimsDeadDict != null && stepData.mapData.victimsDeadDict.ContainsKey(step))
+        {
+            int count = stepData.mapData.victimsDeadDict[step].count;
+            Debug.Log($"[DATA] Víctimas muertas encontradas para el paso {step}: {count}");
+            return count;
+        }
+        Debug.LogWarning($"[DATA] No se encontró información de víctimas muertas para el paso {step}.");
+        return 0;
+    }
+
+    private int GetAgentsDeadForStep(int step)
+    {
+        if (stepData.mapData.agentsDeadDict != null && stepData.mapData.agentsDeadDict.ContainsKey(step))
+        {
+            int count = stepData.mapData.agentsDeadDict[step].count;
+            Debug.Log($"[DATA] Agentes muertos encontrados para el paso {step}: {count}");
+            return count;
+        }
+        Debug.LogWarning($"[DATA] No se encontró información de agentes muertos para el paso {step}.");
+        return 0;
+    }
+
     void UpdateCounters()
     {
-        if (stepData.mapData == null)
-        {
-            Debug.LogError("MapData no está disponible.");
-            return;
-        }
+        Debug.Log($"[COUNTERS] Actualizando contadores para el paso {currentStep}.");
 
-        // Actualizar el daño estructural restante
-        if (stepData.mapData.structural_damage_left != null && stepData.mapData.structural_damage_left.Length > currentStep)
-        {
-            structuralDamage = stepData.mapData.structural_damage_left[currentStep].value;
-        }
-        else
-        {
-            structuralDamage = 0;
-        }
+        structuralDamage = GetStructuralDamageForStep(currentStep);
+        Debug.Log($"[COUNTERS] Daño estructural para el paso {currentStep}: {structuralDamage}");
 
-        // Actualizar personas rescatadas
-        if (stepData.mapData.saved_lifes != null && stepData.mapData.saved_lifes.Length > currentStep)
-        {
-            rescuedPeople = stepData.mapData.saved_lifes[currentStep].count;
-        }
-        else
-        {
-            rescuedPeople = 0;
-        }
+        rescuedPeople = GetSavedLivesForStep(currentStep);
+        Debug.Log($"[COUNTERS] Personas rescatadas para el paso {currentStep}: {rescuedPeople}");
 
-        // Actualizar personas muertas
-        if (stepData.mapData.victims_dead != null && stepData.mapData.victims_dead.Length > currentStep)
-        {
-            deadPeople = stepData.mapData.victims_dead[currentStep].count;
-        }
-        else
-        {
-            deadPeople = 0;
-        }
+        deadPeople = GetVictimsDeadForStep(currentStep);
+        Debug.Log($"[COUNTERS] Personas muertas para el paso {currentStep}: {deadPeople}");
 
-        // Actualizar agentes muertos
-        if (stepData.mapData.agents_dead != null && stepData.mapData.agents_dead.Length > currentStep)
-        {
-            deadAgents = stepData.mapData.agents_dead[currentStep].count;
-        }
-        else
-        {
-            deadAgents = 0;
-        }
+        deadAgents = GetAgentsDeadForStep(currentStep);
+        Debug.Log($"[COUNTERS] Agentes muertos para el paso {currentStep}: {deadAgents}");
     }
 
-    // Método para actualizar el tablero según el paso actual
     void UpdateBoard()
     {
+        Debug.Log($"[BOARD] Actualizando tablero para el paso {currentStep}.");
+
         if (gameManager != null)
         {
             gameManager.UpdateBoardState(currentStep);
+            Debug.Log($"[BOARD] Tablero actualizado para el paso {currentStep}.");
         }
         else
         {
-            Debug.LogError("GameManager no está asignado en StepManager.");
+            Debug.LogError("[BOARD] GameManager no está asignado en StepManager.");
         }
     }
 
@@ -179,17 +193,5 @@ public class StepManager : MonoBehaviour
 
         // Mostrar el número de paso
         GUI.Label(new Rect(Screen.width / 2 - 100, 10, 200, 40), $"Paso: {currentStep}", styleStep);
-
-        // Botón para avanzar al siguiente paso
-        if (GUI.Button(new Rect(20, 180, 140, 30), "Siguiente Paso"))
-        {
-            AdvanceStep();
-        }
-
-        // Botón para retroceder al paso anterior
-        if (GUI.Button(new Rect(180, 180, 140, 30), "Paso Anterior"))
-        {
-            PreviousStep();
-        }
     }
 }

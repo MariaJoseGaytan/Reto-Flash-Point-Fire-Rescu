@@ -318,25 +318,30 @@ public class GameManager : MonoBehaviour
 
     // Método para actualizar el tablero según el paso actual
     public void UpdateBoardState(int step)
+{
+    Debug.Log($"Actualizando el tablero para el paso: {step}");
+    if (currentGameState == null || currentGameState.agents.Length == 0)
     {
-        if (currentGameState == null || currentGameState.agents.Length == 0)
-        {
-            Debug.LogError("El estado actual del juego no está disponible.");
-            return;
-        }
-
-        if (step < 0 || step >= currentGameState.agents.Length)
-        {
-            Debug.LogError($"Paso inválido: {step}. Debe estar entre 0 y {currentGameState.agents.Length - 1}");
-            return;
-        }
-
-        var currentStepData = currentGameState.agents[step];
-
-        // Aquí deberías implementar la lógica para actualizar el tablero según el paso actual.
-        // Esto podría implicar mover agentes, actualizar marcadores, paredes, etc.
-
-        Debug.Log($"Actualizando el tablero al paso: {step}");
-        // Implementa la lógica específica de tu juego aquí.
+        Debug.LogError("El estado actual del juego no está disponible o no contiene agentes.");
+        return;
     }
+
+    if (step < 0 || step >= currentGameState.agents.Length)
+    {
+        Debug.LogError($"Paso inválido: {step}. Debe estar entre 0 y {currentGameState.agents.Length - 1}");
+        return;
+    }
+
+    var currentStepData = currentGameState.agents[step];
+
+    Debug.Log($"Actualizando con los siguientes datos:");
+    foreach (var agent in currentStepData.data)
+    {
+        string targetStr = agent.target != null ? $"({agent.target[0]}, {agent.target[1]})" : "null";
+        Debug.Log($"Agent {agent.agent_id} en posición ({agent.position[0]}, {agent.position[1]}) con objetivo {targetStr}");
+    }
+
+    // Aquí deberías implementar la lógica para mover agentes y actualizar marcadores según los datos.
+}
+
 }
