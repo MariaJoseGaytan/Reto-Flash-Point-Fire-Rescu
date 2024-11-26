@@ -58,6 +58,9 @@ public class StepManager : MonoBehaviour
                 totalSteps = stepData.mapData.agents.Length;
                 Debug.Log($"[SERVER] Número total de pasos cargados: {totalSteps}");
 
+
+                gameManager.SetMapData(stepData.mapData);
+
                 // Asegurarnos de que el currentStep inicial está en el rango válido
                 currentStep = Mathf.Clamp(currentStep, 0, totalSteps - 1);
 

@@ -13,6 +13,7 @@ public class GameManager : MonoBehaviour
     public GameObject vMarkerPrefab;   // Prefab para marker_type "v"
     public GameObject fireMarkerPrefab; // Prefab para FireMarkerAgent
     public GameObject doorPrefab;      // Prefab para las puertas
+    public GameObject penguinPrefab;   // Prefab del pingüino (nuevo)
 
     // Padre para organizar las celdas
     public Transform boardParent;
@@ -21,13 +22,18 @@ public class GameManager : MonoBehaviour
     private float cellSize = 19.96322f;
     
     // Variable para almacenar el estado actual del juego
-    private MapData currentGameState;
+    public MapData currentGameState;
+
+    // Diccionario para rastrear los pingüinos instanciados
+    private Dictionary<int, GameObject> penguinGameObjects = new Dictionary<int, GameObject>();
+
 
 
     void Start()
     {
         // Solicitar el estado inicial del juego al servidor
         StartCoroutine(serverManager.GetGameState(OnGameStateReceived));
+
     }
 
     void OnGameStateReceived(string json)
@@ -316,8 +322,7 @@ public class GameManager : MonoBehaviour
         Debug.Log($"FireMarker instanciado en: {markerPosition}");
     }
 
-    // Método para actualizar el tablero según el paso actual
-    public void UpdateBoardState(int step)
+public void UpdateBoardState(int step)
 {
     Debug.Log($"Actualizando el tablero para el paso: {step}");
     if (currentGameState == null || currentGameState.agents.Length == 0)
@@ -334,14 +339,45 @@ public class GameManager : MonoBehaviour
 
     var currentStepData = currentGameState.agents[step];
 
-    Debug.Log($"Actualizando con los siguientes datos:");
-    foreach (var agent in currentStepData.data)
+    // Actualizar la posición de los pingüinos
+    foreach (var agentData in currentStepData.data)
     {
-        string targetStr = agent.target != null ? $"({agent.target[0]}, {agent.target[1]})" : "null";
-        Debug.Log($"Agent {agent.agent_id} en posición ({agent.position[0]}, {agent.position[1]}) con objetivo {targetStr}");
+        int agentId = agentData.agent_id;
+        int[] position = agentData.position;
+        // Intercambiar las coordenadas x e y
+        Vector3 worldPosition = ConvertGridPositionToWorldPosition(position[1], position[0]);
+
+        if (penguinGameObjects.ContainsKey(agentId))
+        {
+            // Si el pingüino ya existe, moverlo a la nueva posición
+            GameObject penguin = penguinGameObjects[agentId];
+            penguin.transform.position = worldPosition;
+            Debug.Log($"Moviendo pingüino {agentId} a posición {worldPosition}");
+        }
+        else
+        {
+            // Si el pingüino no existe, instanciarlo
+            GameObject penguin = Instantiate(penguinPrefab, worldPosition, Quaternion.identity, boardParent);
+            penguin.name = $"Penguin_{agentId}";
+            penguinGameObjects.Add(agentId, penguin);
+            Debug.Log($"Creando pingüino {agentId} en posición {worldPosition}");
+        }
+    }
+}
+
+    // Método para convertir las coordenadas de la cuadrícula a posiciones en el mundo
+    private Vector3 ConvertGridPositionToWorldPosition(int row, int column)
+    {
+        float x = column * cellSize;
+        float z = -row * cellSize;
+        float y = 0; // Ajusta la altura si es necesario
+        return new Vector3(x, y, z);
     }
 
-    // Aquí deberías implementar la lógica para mover agentes y actualizar marcadores según los datos.
+    public void SetMapData(MapData mapData)
+{
+    this.currentGameState = mapData;
 }
+
 
 }
