@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 
 public class GameManager : MonoBehaviour
@@ -13,27 +14,36 @@ public class GameManager : MonoBehaviour
     public GameObject vMarkerPrefab;   // Prefab para marker_type "v"
     public GameObject fireMarkerPrefab; // Prefab para FireMarkerAgent
     public GameObject doorPrefab;      // Prefab para las puertas
-    public GameObject penguinPrefab;   // Prefab del pingüino (nuevo)
+    public GameObject penguinPrefab;   // Prefab del pingüino
 
     // Padre para organizar las celdas
     public Transform boardParent;
 
     // Tamaño de la celda (escala del prefab)
     private float cellSize = 19.96322f;
-    
+
     // Variable para almacenar el estado actual del juego
     public MapData currentGameState;
 
     // Diccionario para rastrear los pingüinos instanciados
     private Dictionary<int, GameObject> penguinGameObjects = new Dictionary<int, GameObject>();
 
+    // Diccionario para rastrear las paredes instanciadas
+    private Dictionary<string, GameObject> wallGameObjects = new Dictionary<string, GameObject>();
 
+    // Diccionario para rastrear las posiciones de las paredes
+    private Dictionary<string, GameObject> wallPositions = new Dictionary<string, GameObject>();
+
+    // Diccionario para rastrear los marcadores de fuego
+    private Dictionary<string, GameObject> fireMarkers = new Dictionary<string, GameObject>();
+
+    // Conjunto para rastrear las posiciones actuales de fuego
+    private HashSet<string> currentFirePositions = new HashSet<string>();
 
     void Start()
     {
         // Solicitar el estado inicial del juego al servidor
         StartCoroutine(serverManager.GetGameState(OnGameStateReceived));
-
     }
 
     void OnGameStateReceived(string json)
@@ -81,10 +91,11 @@ public class GameManager : MonoBehaviour
                 {
                     PlaceMarker(agent, fila, columna); // Colocar marcador
                 }
-                else if (agent.type == "FireMarkerAgent")
-                {
-                    PlaceFireMarker(agent, cellPosition); // Colocar marcador de fuego
-                }
+                // Eliminamos la colocación inicial de marcadores de fuego
+                // else if (agent.type == "FireMarkerAgent")
+                // {
+                //     PlaceFireMarker(agent, cellPosition); // Colocar marcador de fuego
+                // }
             }
         }
     }
@@ -140,7 +151,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-
     void CreateWalls(AgentData agent, int fila, int columna)
     {
         float wallHeight = 7.1f; // Altura de las paredes
@@ -161,7 +171,7 @@ public class GameManager : MonoBehaviour
         char[] walls = agent.walls.ToCharArray();
 
         // Variables temporales para la modificación de paredes
-        int filaMod = columna;     
+        int filaMod = columna;
         int columnaMod = fila;
 
         // Ajustar paredes si la celda es una entrada
@@ -192,7 +202,6 @@ public class GameManager : MonoBehaviour
         Debug.Log($"[DEBUG] Paredes ajustadas para celda en fila: {fila}, columna: {columna}, resultado: {new string(walls)}");
 
         // Usar las paredes ajustadas para crear las paredes
-        // Aquí utilizamos las variables originales de fila y columna
 
         // Pared superior
         if (walls[0] == '1')
@@ -200,14 +209,14 @@ public class GameManager : MonoBehaviour
             float x = offsetX_ParedArriba + columna * cellSize;
             float z = offsetZ_ParedArriba - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
-            InstantiateWall(position, Quaternion.identity, "Pared superior");
+            InstantiateWall(position, Quaternion.identity, "Pared superior", fila, columna, "up");
         }
         else if (walls[0] == '2') // Puerta superior
         {
             float x = offsetX_ParedArriba + columna * cellSize;
             float z = offsetZ_ParedArriba - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
-            InstantiateDoor(position, Quaternion.identity, "Puerta superior");
+            InstantiateDoor(position, Quaternion.identity, "Puerta superior", fila, columna, "up");
         }
 
         // Pared izquierda
@@ -217,7 +226,7 @@ public class GameManager : MonoBehaviour
             float z = offsetZ_ParedIzquierda - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             Quaternion rotation = Quaternion.Euler(0, 90, 0);
-            InstantiateWall(position, rotation, "Pared izquierda");
+            InstantiateWall(position, rotation, "Pared izquierda", fila, columna, "left");
         }
         else if (walls[1] == '2') // Puerta izquierda
         {
@@ -225,7 +234,7 @@ public class GameManager : MonoBehaviour
             float z = offsetZ_ParedIzquierda - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             Quaternion rotation = Quaternion.Euler(0, 90, 0);
-            InstantiateDoor(position, rotation, "Puerta izquierda");
+            InstantiateDoor(position, rotation, "Puerta izquierda", fila, columna, "left");
         }
 
         // Pared inferior
@@ -234,14 +243,14 @@ public class GameManager : MonoBehaviour
             float x = offsetX_ParedAbajo + (columna - 1) * cellSize;
             float z = offsetZ_ParedAbajo - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
-            InstantiateWall(position, Quaternion.identity, "Pared inferior");
+            InstantiateWall(position, Quaternion.identity, "Pared inferior", fila, columna, "down");
         }
         else if (walls[2] == '2') // Puerta inferior
         {
             float x = offsetX_ParedAbajo + (columna - 1) * cellSize;
             float z = offsetZ_ParedAbajo - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
-            InstantiateDoor(position, Quaternion.identity, "Puerta inferior");
+            InstantiateDoor(position, Quaternion.identity, "Puerta inferior", fila, columna, "down");
         }
 
         // Pared derecha
@@ -251,7 +260,7 @@ public class GameManager : MonoBehaviour
             float z = offsetZ_ParedDerecha - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             Quaternion rotation = Quaternion.Euler(0, 90, 0);
-            InstantiateWall(position, rotation, "Pared derecha");
+            InstantiateWall(position, rotation, "Pared derecha", fila, columna, "right");
         }
         else if (walls[3] == '2') // Puerta derecha
         {
@@ -259,22 +268,58 @@ public class GameManager : MonoBehaviour
             float z = offsetZ_ParedDerecha - fila * cellSize;
             Vector3 position = new Vector3(x, wallHeight, z);
             Quaternion rotation = Quaternion.Euler(0, 90, 0);
-            InstantiateDoor(position, rotation, "Puerta derecha");
+            InstantiateDoor(position, rotation, "Puerta derecha", fila, columna, "right");
         }
     }
 
-    void InstantiateWall(Vector3 position, Quaternion rotation, string wallName)
+    string GetWallPositionKey(Vector3 position)
     {
-        GameObject wall = Instantiate(wallPrefab, position, rotation, boardParent);
-        wall.name = wallName;
-        Debug.Log($"{wallName} creada en: {position}");
+        // Redondear las posiciones para evitar problemas de precisión en coma flotante
+        float x = Mathf.Round(position.x * 1000f) / 1000f;
+        float y = Mathf.Round(position.y * 1000f) / 1000f;
+        float z = Mathf.Round(position.z * 1000f) / 1000f;
+        return $"{x}_{y}_{z}";
     }
 
-    void InstantiateDoor(Vector3 position, Quaternion rotation, string doorName)
+    void InstantiateWall(Vector3 position, Quaternion rotation, string wallName, int fila, int columna, string direction)
     {
+        string positionKey = GetWallPositionKey(position);
+        if (wallPositions.ContainsKey(positionKey))
+        {
+            // Ya existe una pared en esta posición, no instanciar la nueva pared
+            Debug.Log($"Ya existe una pared en la posición {position}. No se instanciará {wallName}.");
+            return;
+        }
+        GameObject wall = Instantiate(wallPrefab, position, rotation, boardParent);
+        wall.name = wallName;
+        string wallKey = GetWallKey(fila, columna, direction);
+        wallGameObjects[wallKey] = wall;
+        wallPositions[positionKey] = wall;
+        Debug.Log($"{wallName} creada en: {position}");
+        Debug.Log($"[CREACIÓN] wallKey: {wallKey}, positionKey: {positionKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
+    }
+
+    void InstantiateDoor(Vector3 position, Quaternion rotation, string doorName, int fila, int columna, string direction)
+    {
+        string positionKey = GetWallPositionKey(position);
+        if (wallPositions.ContainsKey(positionKey))
+        {
+            // Ya existe una pared en esta posición, no instanciar la nueva puerta
+            Debug.Log($"Ya existe una pared en la posición {position}. No se instanciará {doorName}.");
+            return;
+        }
         GameObject door = Instantiate(doorPrefab, position, rotation, boardParent);
         door.name = doorName;
+        string wallKey = GetWallKey(fila, columna, direction);
+        wallGameObjects[wallKey] = door;
+        wallPositions[positionKey] = door;
         Debug.Log($"{doorName} creada en: {position}");
+        Debug.Log($"[CREACIÓN] wallKey: {wallKey}, positionKey: {positionKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
+    }
+
+    string GetWallKey(int fila, int columna, string direction)
+    {
+        return $"{fila}_{columna}_{direction}";
     }
 
     // Método para colocar los marcadores (víctimas)
@@ -309,80 +354,169 @@ public class GameManager : MonoBehaviour
         Debug.Log($"Marcador '{agent.marker_type}' instanciado en: {markerPosition}");
     }
 
-    void PlaceFireMarker(AgentData agent, Vector3 cellPosition)
+    // Eliminamos el método PlaceFireMarker ya que no se utilizará al construir el tablero
+    // void PlaceFireMarker(AgentData agent, Vector3 cellPosition)
+    // {
+    //     // Código eliminado
+    // }
+
+    public void UpdateBoardState(int step)
+    {
+        Debug.Log($"Actualizando el tablero para el paso: {step}");
+        if (currentGameState == null)
+        {
+            Debug.LogError("El estado actual del juego no está disponible.");
+            return;
+        }
+
+        // Actualizar la posición de los pingüinos
+        if (currentGameState.agents != null && currentGameState.agents.Length > 0)
+        {
+            if (step < 0 || step >= currentGameState.agents.Length)
+            {
+                Debug.LogError($"Paso inválido: {step}. Debe estar entre 0 y {currentGameState.agents.Length - 1}");
+                return;
+            }
+
+            var currentStepData = currentGameState.agents[step];
+
+            foreach (var agentData in currentStepData.data)
+            {
+                int agentId = agentData.agent_id;
+                int[] position = agentData.position;
+
+                // Restar 1 a cada coordenada y luego intercambiarlas
+                int adjustedRow = position[1] - 1;
+                int adjustedColumn = position[0] - 1;
+                Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
+
+                if (penguinGameObjects.ContainsKey(agentId))
+                {
+                    // Si el pingüino ya existe, moverlo a la nueva posición
+                    GameObject penguin = penguinGameObjects[agentId];
+                    penguin.transform.position = worldPosition;
+                    Debug.Log($"Moviendo pingüino {agentId} a posición {worldPosition}");
+                }
+                else
+                {
+                    // Si el pingüino no existe, instanciarlo
+                    GameObject penguin = Instantiate(penguinPrefab, worldPosition, Quaternion.identity, boardParent);
+                    penguin.name = $"Penguin_{agentId}";
+                    penguinGameObjects.Add(agentId, penguin);
+                    Debug.Log($"Creando pingüino {agentId} en posición {worldPosition}");
+                }
+            }
+        }
+
+        // Procesar paredes destruidas
+        if (currentGameState.destroyed_walls != null)
+        {
+            var destroyedWallsStep = currentGameState.destroyed_walls.FirstOrDefault(dw => dw.step == step);
+            if (destroyedWallsStep != null && destroyedWallsStep.data != null)
+            {
+                foreach (var destroyedWall in destroyedWallsStep.data)
+                {
+                    int[] cellPosition = destroyedWall.cell;
+                    string direction = destroyedWall.direction;
+
+                    // Obtener las coordenadas de la celda
+                    int fila = cellPosition[0];
+                    int columna = cellPosition[1];
+
+                    // Generar la clave de la pared utilizando las mismas variables que al crearla
+                    string wallKey = GetWallKey(fila, columna, direction);
+
+                    Debug.Log($"[DESTRUCCIÓN] wallKey: {wallKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
+
+                    if (wallGameObjects.ContainsKey(wallKey))
+                    {
+                        // Eliminar la pared del diccionario y destruir el GameObject
+                        GameObject wall = wallGameObjects[wallKey];
+                        Destroy(wall);
+                        wallGameObjects.Remove(wallKey);
+                        Debug.Log($"Pared destruida en celda ({fila}, {columna}) dirección {direction}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"No se encontró la pared en celda ({fila}, {columna}) dirección {direction} para destruir.");
+                    }
+                }
+            }
+        }
+
+        // Actualizar los marcadores de fuego
+        if (currentGameState.fire_expansion != null)
+        {
+            var fireExpansionStep = currentGameState.fire_expansion.FirstOrDefault(f => f.step == step);
+            if (fireExpansionStep != null && fireExpansionStep.data != null)
+            {
+                HashSet<string> newFirePositions = new HashSet<string>();
+
+                foreach (var fireData in fireExpansionStep.data)
+                {
+                    int[] position = fireData.position;
+
+                    // Restar 1 a cada coordenada
+                    int adjustedRow = position[0] - 1;
+                    int adjustedColumn = position[1] - 1;
+
+                    // Crear una clave única para esta posición
+                    string positionKey = $"{adjustedRow}_{adjustedColumn}";
+
+                    newFirePositions.Add(positionKey);
+
+                    // Si no existe ya un marcador de fuego en esta posición, instanciarlo
+                    if (!currentFirePositions.Contains(positionKey))
+                    {
+                        Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
+                        PlaceFireMarkerAtPosition(worldPosition, positionKey);
+                    }
+                }
+
+                // Encontrar marcadores de fuego que ya no existen y eliminarlos
+                foreach (var positionKey in currentFirePositions)
+                {
+                    if (!newFirePositions.Contains(positionKey))
+                    {
+                        if (fireMarkers.ContainsKey(positionKey))
+                        {
+                            GameObject marker = fireMarkers[positionKey];
+                            Destroy(marker);
+                            fireMarkers.Remove(positionKey);
+                            Debug.Log($"Marcador de fuego eliminado en posición {positionKey}");
+                        }
+                    }
+                }
+
+                // Actualizar el conjunto de posiciones actuales de fuego
+                currentFirePositions = newFirePositions;
+            }
+        }
+    }
+
+    void PlaceFireMarkerAtPosition(Vector3 worldPosition, string positionKey)
     {
         float markerHeight = 7.3f; // Altura del marcador de fuego
+        Vector3 markerPosition = new Vector3(worldPosition.x, markerHeight, worldPosition.z);
 
-        // Posición del marcador: centro de la celda, a una altura específica
-        Vector3 markerPosition = new Vector3(cellPosition.x, markerHeight, cellPosition.z);
-
-        // Instanciar el marcador de fuego
         GameObject marker = Instantiate(fireMarkerPrefab, markerPosition, Quaternion.identity, boardParent);
-        marker.name = $"FireMarker_{agent.unique_id}";
-        Debug.Log($"FireMarker instanciado en: {markerPosition}");
+        marker.name = $"FireMarker_{positionKey}";
+
+        fireMarkers[positionKey] = marker;
+        Debug.Log($"Marcador de fuego instanciado en: {markerPosition} para posición {positionKey}");
     }
 
-public void UpdateBoardState(int step)
-{
-    Debug.Log($"Actualizando el tablero para el paso: {step}");
-    if (currentGameState == null || currentGameState.agents.Length == 0)
+    // Método para convertir las coordenadas de la cuadrícula a posiciones en el mundo
+    private Vector3 ConvertGridPositionToWorldPosition(int row, int column)
     {
-        Debug.LogError("El estado actual del juego no está disponible o no contiene agentes.");
-        return;
+        float x = column * cellSize;
+        float z = -row * cellSize;
+        float y = 0; // Ajusta la altura si es necesario
+        return new Vector3(x, y, z);
     }
-
-    if (step < 0 || step >= currentGameState.agents.Length)
-    {
-        Debug.LogError($"Paso inválido: {step}. Debe estar entre 0 y {currentGameState.agents.Length - 1}");
-        return;
-    }
-
-    var currentStepData = currentGameState.agents[step];
-
-    // Actualizar la posición de los pingüinos
-    foreach (var agentData in currentStepData.data)
-    {
-        int agentId = agentData.agent_id;
-        int[] position = agentData.position;
-
-        // Restar 1 a cada coordenada y luego intercambiarlas
-        int adjustedRow = position[1] - 1;
-        int adjustedColumn = position[0] - 1;
-        Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
-
-        if (penguinGameObjects.ContainsKey(agentId))
-        {
-            // Si el pingüino ya existe, moverlo a la nueva posición
-            GameObject penguin = penguinGameObjects[agentId];
-            penguin.transform.position = worldPosition;
-            Debug.Log($"Moviendo pingüino {agentId} a posición {worldPosition}");
-        }
-        else
-        {
-            // Si el pingüino no existe, instanciarlo
-            GameObject penguin = Instantiate(penguinPrefab, worldPosition, Quaternion.identity, boardParent);
-            penguin.name = $"Penguin_{agentId}";
-            penguinGameObjects.Add(agentId, penguin);
-            Debug.Log($"Creando pingüino {agentId} en posición {worldPosition}");
-        }
-    }
-}
-
-
-// Método para convertir las coordenadas de la cuadrícula a posiciones en el mundo
-private Vector3 ConvertGridPositionToWorldPosition(int row, int column)
-{
-    float x = column * cellSize;
-    float z = -row * cellSize;
-    float y = 0; // Ajusta la altura si es necesario
-    return new Vector3(x, y, z);
-}
-
 
     public void SetMapData(MapData mapData)
-{
-    this.currentGameState = mapData;
-}
-
-
+    {
+        this.currentGameState = mapData;
+    }
 }
