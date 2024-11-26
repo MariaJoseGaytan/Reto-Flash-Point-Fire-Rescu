@@ -445,53 +445,54 @@ public class GameManager : MonoBehaviour
         }
 
         // Actualizar los marcadores de fuego
-        if (currentGameState.fire_expansion != null)
+        // Actualizar los marcadores de fuego
+if (currentGameState.fire_expansion != null)
+{
+    var fireExpansionStep = currentGameState.fire_expansion.FirstOrDefault(f => f.step == step);
+    if (fireExpansionStep != null && fireExpansionStep.data != null)
+    {
+        HashSet<string> newFirePositions = new HashSet<string>();
+
+        foreach (var fireData in fireExpansionStep.data)
         {
-            var fireExpansionStep = currentGameState.fire_expansion.FirstOrDefault(f => f.step == step);
-            if (fireExpansionStep != null && fireExpansionStep.data != null)
+            int[] position = fireData.position;
+
+            // Restar 1 a cada coordenada y **intercambiarlas**
+            int adjustedRow = position[1] - 1;     // Cambiado position[0] por position[1]
+            int adjustedColumn = position[0] - 1;  // Cambiado position[1] por position[0]
+
+            // Crear una clave única para esta posición
+            string positionKey = $"{adjustedRow}_{adjustedColumn}";
+
+            newFirePositions.Add(positionKey);
+
+            // Si no existe ya un marcador de fuego en esta posición, instanciarlo
+            if (!currentFirePositions.Contains(positionKey))
             {
-                HashSet<string> newFirePositions = new HashSet<string>();
-
-                foreach (var fireData in fireExpansionStep.data)
-                {
-                    int[] position = fireData.position;
-
-                    // Restar 1 a cada coordenada
-                    int adjustedRow = position[0] - 1;
-                    int adjustedColumn = position[1] - 1;
-
-                    // Crear una clave única para esta posición
-                    string positionKey = $"{adjustedRow}_{adjustedColumn}";
-
-                    newFirePositions.Add(positionKey);
-
-                    // Si no existe ya un marcador de fuego en esta posición, instanciarlo
-                    if (!currentFirePositions.Contains(positionKey))
-                    {
-                        Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
-                        PlaceFireMarkerAtPosition(worldPosition, positionKey);
-                    }
-                }
-
-                // Encontrar marcadores de fuego que ya no existen y eliminarlos
-                foreach (var positionKey in currentFirePositions)
-                {
-                    if (!newFirePositions.Contains(positionKey))
-                    {
-                        if (fireMarkers.ContainsKey(positionKey))
-                        {
-                            GameObject marker = fireMarkers[positionKey];
-                            Destroy(marker);
-                            fireMarkers.Remove(positionKey);
-                            Debug.Log($"Marcador de fuego eliminado en posición {positionKey}");
-                        }
-                    }
-                }
-
-                // Actualizar el conjunto de posiciones actuales de fuego
-                currentFirePositions = newFirePositions;
+                Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
+                PlaceFireMarkerAtPosition(worldPosition, positionKey);
             }
         }
+
+        // Encontrar marcadores de fuego que ya no existen y eliminarlos
+        foreach (var positionKey in currentFirePositions)
+        {
+            if (!newFirePositions.Contains(positionKey))
+            {
+                if (fireMarkers.ContainsKey(positionKey))
+                {
+                    GameObject marker = fireMarkers[positionKey];
+                    Destroy(marker);
+                    fireMarkers.Remove(positionKey);
+                    Debug.Log($"Marcador de fuego eliminado en posición {positionKey}");
+                }
+            }
+        }
+
+        // Actualizar el conjunto de posiciones actuales de fuego
+        currentFirePositions = newFirePositions;
+    }
+}
     }
 
     void PlaceFireMarkerAtPosition(Vector3 worldPosition, string positionKey)
