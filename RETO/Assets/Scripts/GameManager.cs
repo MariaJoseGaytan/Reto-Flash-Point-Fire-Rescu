@@ -13,6 +13,7 @@ public class GameManager : MonoBehaviour
     public GameObject fMarkerPrefab;   // Prefab para marker_type "f"
     public GameObject vMarkerPrefab;   // Prefab para marker_type "v"
     public GameObject fireMarkerPrefab; // Prefab para FireMarkerAgent
+    public GameObject smokeMarkerPrefab; // Prefab para SmokeMarkerAgent
     public GameObject doorPrefab;      // Prefab para las puertas
     public GameObject penguinPrefab;   // Prefab del pingüino
 
@@ -39,6 +40,12 @@ public class GameManager : MonoBehaviour
 
     // Conjunto para rastrear las posiciones actuales de fuego
     private HashSet<string> currentFirePositions = new HashSet<string>();
+
+    // Diccionario para rastrear los marcadores de humo
+    private Dictionary<string, GameObject> smokeMarkers = new Dictionary<string, GameObject>();
+
+    // Conjunto para rastrear las posiciones actuales de humo
+    private HashSet<string> currentSmokePositions = new HashSet<string>();
 
     void Start()
     {
@@ -91,11 +98,6 @@ public class GameManager : MonoBehaviour
                 {
                     PlaceMarker(agent, fila, columna); // Colocar marcador
                 }
-                // Eliminamos la colocación inicial de marcadores de fuego
-                // else if (agent.type == "FireMarkerAgent")
-                // {
-                //     PlaceFireMarker(agent, cellPosition); // Colocar marcador de fuego
-                // }
             }
         }
     }
@@ -354,12 +356,6 @@ public class GameManager : MonoBehaviour
         Debug.Log($"Marcador '{agent.marker_type}' instanciado en: {markerPosition}");
     }
 
-    // Eliminamos el método PlaceFireMarker ya que no se utilizará al construir el tablero
-    // void PlaceFireMarker(AgentData agent, Vector3 cellPosition)
-    // {
-    //     // Código eliminado
-    // }
-
     public void UpdateBoardState(int step)
     {
         Debug.Log($"Actualizando el tablero para el paso: {step}");
@@ -445,54 +441,102 @@ public class GameManager : MonoBehaviour
         }
 
         // Actualizar los marcadores de fuego
-        // Actualizar los marcadores de fuego
-if (currentGameState.fire_expansion != null)
-{
-    var fireExpansionStep = currentGameState.fire_expansion.FirstOrDefault(f => f.step == step);
-    if (fireExpansionStep != null && fireExpansionStep.data != null)
-    {
-        HashSet<string> newFirePositions = new HashSet<string>();
-
-        foreach (var fireData in fireExpansionStep.data)
+        if (currentGameState.fire_expansion != null)
         {
-            int[] position = fireData.position;
-
-            // Restar 1 a cada coordenada y **intercambiarlas**
-            int adjustedRow = position[1] - 1;     // Cambiado position[0] por position[1]
-            int adjustedColumn = position[0] - 1;  // Cambiado position[1] por position[0]
-
-            // Crear una clave única para esta posición
-            string positionKey = $"{adjustedRow}_{adjustedColumn}";
-
-            newFirePositions.Add(positionKey);
-
-            // Si no existe ya un marcador de fuego en esta posición, instanciarlo
-            if (!currentFirePositions.Contains(positionKey))
+            var fireExpansionStep = currentGameState.fire_expansion.FirstOrDefault(f => f.step == step);
+            if (fireExpansionStep != null && fireExpansionStep.data != null)
             {
-                Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
-                PlaceFireMarkerAtPosition(worldPosition, positionKey);
-            }
-        }
+                HashSet<string> newFirePositions = new HashSet<string>();
 
-        // Encontrar marcadores de fuego que ya no existen y eliminarlos
-        foreach (var positionKey in currentFirePositions)
-        {
-            if (!newFirePositions.Contains(positionKey))
-            {
-                if (fireMarkers.ContainsKey(positionKey))
+                foreach (var fireData in fireExpansionStep.data)
                 {
-                    GameObject marker = fireMarkers[positionKey];
-                    Destroy(marker);
-                    fireMarkers.Remove(positionKey);
-                    Debug.Log($"Marcador de fuego eliminado en posición {positionKey}");
+                    int[] position = fireData.position;
+
+                    // Restar 1 a cada coordenada y **intercambiarlas**
+                    int adjustedRow = position[1] - 1;
+                    int adjustedColumn = position[0] - 1;
+
+                    // Crear una clave única para esta posición
+                    string positionKey = $"{adjustedRow}_{adjustedColumn}";
+
+                    newFirePositions.Add(positionKey);
+
+                    // Si no existe ya un marcador de fuego en esta posición, instanciarlo
+                    if (!currentFirePositions.Contains(positionKey))
+                    {
+                        Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
+                        PlaceFireMarkerAtPosition(worldPosition, positionKey);
+                    }
                 }
+
+                // Encontrar marcadores de fuego que ya no existen y eliminarlos
+                foreach (var positionKey in currentFirePositions)
+                {
+                    if (!newFirePositions.Contains(positionKey))
+                    {
+                        if (fireMarkers.ContainsKey(positionKey))
+                        {
+                            GameObject marker = fireMarkers[positionKey];
+                            Destroy(marker);
+                            fireMarkers.Remove(positionKey);
+                            Debug.Log($"Marcador de fuego eliminado en posición {positionKey}");
+                        }
+                    }
+                }
+
+                // Actualizar el conjunto de posiciones actuales de fuego
+                currentFirePositions = newFirePositions;
             }
         }
 
-        // Actualizar el conjunto de posiciones actuales de fuego
-        currentFirePositions = newFirePositions;
-    }
-}
+        // Actualizar los marcadores de humo
+        if (currentGameState.smoke_expansion != null)
+        {
+            var smokeExpansionStep = currentGameState.smoke_expansion.FirstOrDefault(s => s.step == step);
+            if (smokeExpansionStep != null && smokeExpansionStep.data != null)
+            {
+                HashSet<string> newSmokePositions = new HashSet<string>();
+
+                foreach (var smokeData in smokeExpansionStep.data)
+                {
+                    int[] position = smokeData.position;
+
+                    // Restar 1 a cada coordenada y **intercambiarlas**
+                    int adjustedRow = position[1] - 1;
+                    int adjustedColumn = position[0] - 1;
+
+                    // Crear una clave única para esta posición
+                    string positionKey = $"{adjustedRow}_{adjustedColumn}";
+
+                    newSmokePositions.Add(positionKey);
+
+                    // Si no existe ya un marcador de humo en esta posición, instanciarlo
+                    if (!currentSmokePositions.Contains(positionKey))
+                    {
+                        Vector3 worldPosition = ConvertGridPositionToWorldPosition(adjustedRow, adjustedColumn);
+                        PlaceSmokeMarkerAtPosition(worldPosition, positionKey);
+                    }
+                }
+
+                // Encontrar marcadores de humo que ya no existen y eliminarlos
+                foreach (var positionKey in currentSmokePositions)
+                {
+                    if (!newSmokePositions.Contains(positionKey))
+                    {
+                        if (smokeMarkers.ContainsKey(positionKey))
+                        {
+                            GameObject marker = smokeMarkers[positionKey];
+                            Destroy(marker);
+                            smokeMarkers.Remove(positionKey);
+                            Debug.Log($"Marcador de humo eliminado en posición {positionKey}");
+                        }
+                    }
+                }
+
+                // Actualizar el conjunto de posiciones actuales de humo
+                currentSmokePositions = newSmokePositions;
+            }
+        }
     }
 
     void PlaceFireMarkerAtPosition(Vector3 worldPosition, string positionKey)
@@ -505,6 +549,18 @@ if (currentGameState.fire_expansion != null)
 
         fireMarkers[positionKey] = marker;
         Debug.Log($"Marcador de fuego instanciado en: {markerPosition} para posición {positionKey}");
+    }
+
+    void PlaceSmokeMarkerAtPosition(Vector3 worldPosition, string positionKey)
+    {
+        float markerHeight = -2.5f; // Altura del marcador de humo
+        Vector3 markerPosition = new Vector3(worldPosition.x, markerHeight, worldPosition.z);
+
+        GameObject marker = Instantiate(smokeMarkerPrefab, markerPosition, Quaternion.identity, boardParent);
+        marker.name = $"SmokeMarker_{positionKey}";
+
+        smokeMarkers[positionKey] = marker;
+        Debug.Log($"Marcador de humo instanciado en: {markerPosition} para posición {positionKey}");
     }
 
     // Método para convertir las coordenadas de la cuadrícula a posiciones en el mundo
