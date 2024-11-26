@@ -1,10 +1,13 @@
+using System;
+using System.Collections.Generic;
+
 using UnityEngine;
 
 [System.Serializable]
 public class StepData : MonoBehaviour
 {
-    // Clase principal que contendrá los datos deserializados del JSON
-    private MapData mapData;
+    // Hacer MapData pública para que otros scripts puedan acceder a ella
+    public MapData mapData { get; private set; }
 
     // Método para procesar el JSON descargado
     public void ProcessStepData(string json)
@@ -20,7 +23,8 @@ public class StepData : MonoBehaviour
         {
             foreach (var agent in mapData.agents[0].data)
             {
-                Debug.Log($"Agent {agent.agent_id} at position ({agent.position[0]}, {agent.position[1]})");
+                string targetStr = agent.target != null ? $"({agent.target[0]}, {agent.target[1]})" : "null";
+                Debug.Log($"Agent {agent.agent_id} at position ({agent.position[0]}, {agent.position[1]}) targeting {targetStr}");
             }
         }
 
@@ -32,8 +36,9 @@ public class StepData : MonoBehaviour
     }
 }
 
+
 // Clase principal que modela el JSON completo
-[System.Serializable]
+[Serializable]
 public class MapData
 {
     public AgentsStepData[] agents;                  // Datos de agentes por paso
@@ -50,14 +55,14 @@ public class MapData
 }
 
 // Subclase para agentes
-[System.Serializable]
+[Serializable]
 public class AgentsStepData
 {
     public int step;            // Número del paso
     public AgentDataStep[] data;    // Lista de agentes
 }
 
-[System.Serializable]
+[Serializable]
 public class AgentDataStep
 {
     public int agent_id;        // ID del agente
@@ -67,14 +72,14 @@ public class AgentDataStep
 }
 
 // Subclase para expansión de fuego
-[System.Serializable]
+[Serializable]
 public class FireStepData
 {
     public int step;            // Número del paso
     public FireData[] data;     // Lista de expansiones de fuego
 }
 
-[System.Serializable]
+[Serializable]
 public class FireData
 {
     public int[] position;      // Posición del fuego [x, y]
@@ -82,14 +87,14 @@ public class FireData
 }
 
 // Subclase para expansión de humo
-[System.Serializable]
+[Serializable]
 public class SmokeStepData
 {
     public int step;            // Número del paso
     public SmokeData[] data;    // Lista de expansiones de humo
 }
 
-[System.Serializable]
+[Serializable]
 public class SmokeData
 {
     public int[] position;      // Posición del humo [x, y]
@@ -97,14 +102,14 @@ public class SmokeData
 }
 
 // Subclase para puntos de interés
-[System.Serializable]
+[Serializable]
 public class POIStepData
 {
     public int step;            // Número del paso
     public POIData[] data;      // Lista de POIs
 }
 
-[System.Serializable]
+[Serializable]
 public class POIData
 {
     public int[] position;      // Posición del POI [x, y]
@@ -112,7 +117,7 @@ public class POIData
 }
 
 // Subclase para conteos genéricos (muertes y vidas salvadas)
-[System.Serializable]
+[Serializable]
 public class StepCountData
 {
     public int step;            // Número del paso
@@ -120,7 +125,7 @@ public class StepCountData
 }
 
 // Subclase para daño estructural
-[System.Serializable]
+[Serializable]
 public class StructuralDamageData
 {
     public int step;            // Número del paso
@@ -128,30 +133,22 @@ public class StructuralDamageData
 }
 
 // Subclase para puertas destruidas y abiertas
-[System.Serializable]
+[Serializable]
 public class GenericStepData
 {
+    public List<int[]> data;    // Lista de pares de celdas afectadas
     public int step;            // Número del paso
-    public GenericData[] data;  // Lista de datos genéricos
-}
-
-[System.Serializable]
-public class GenericData
-{
-    public int[] cell1;         // Primera celda afectada
-    public int[] cell2;         // Segunda celda afectada (si aplica)
-    public string direction;    // Dirección (e.g., "left", "right")
 }
 
 // Subclase para paredes destruidas
-[System.Serializable]
+[Serializable]
 public class DestroyedWallsStepData
 {
     public int step;            // Número del paso
     public DestroyedWallData[] data; // Lista de paredes destruidas
 }
 
-[System.Serializable]
+[Serializable]
 public class DestroyedWallData
 {
     public int[] cell;          // Celda donde se destruyó la pared

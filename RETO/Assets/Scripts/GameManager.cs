@@ -19,6 +19,10 @@ public class GameManager : MonoBehaviour
 
     // Tamaño de la celda (escala del prefab)
     private float cellSize = 19.96322f;
+    
+    // Variable para almacenar el estado actual del juego
+    private MapData currentGameState;
+
 
     void Start()
     {
@@ -310,5 +314,29 @@ public class GameManager : MonoBehaviour
         GameObject marker = Instantiate(fireMarkerPrefab, markerPosition, Quaternion.identity, boardParent);
         marker.name = $"FireMarker_{agent.unique_id}";
         Debug.Log($"FireMarker instanciado en: {markerPosition}");
+    }
+
+    // Método para actualizar el tablero según el paso actual
+    public void UpdateBoardState(int step)
+    {
+        if (currentGameState == null || currentGameState.agents.Length == 0)
+        {
+            Debug.LogError("El estado actual del juego no está disponible.");
+            return;
+        }
+
+        if (step < 0 || step >= currentGameState.agents.Length)
+        {
+            Debug.LogError($"Paso inválido: {step}. Debe estar entre 0 y {currentGameState.agents.Length - 1}");
+            return;
+        }
+
+        var currentStepData = currentGameState.agents[step];
+
+        // Aquí deberías implementar la lógica para actualizar el tablero según el paso actual.
+        // Esto podría implicar mover agentes, actualizar marcadores, paredes, etc.
+
+        Debug.Log($"Actualizando el tablero al paso: {step}");
+        // Implementa la lógica específica de tu juego aquí.
     }
 }
