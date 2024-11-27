@@ -674,7 +674,7 @@ MonoBehaviour:
   stepData: {fileID: 2105800413}
   serverManager: {fileID: 2108433998}
   gameManager: {fileID: 1649286201}
-  stepInterval: 5
+  stepInterval: 2
 --- !u!4 &1974987911
 Transform:
   m_ObjectHideFlags: 0

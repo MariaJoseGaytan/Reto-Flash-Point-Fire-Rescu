@@ -531,40 +531,47 @@ public class GameManager : MonoBehaviour
         }
 
         // Procesar puertas abiertas (también las destruimos)
-        if (currentGameState.open_doors != null)
+    if (currentGameState.open_doors != null)
+    {
+        var openDoorsStep = currentGameState.open_doors.FirstOrDefault(od => od.step == step);
+        if (openDoorsStep != null && openDoorsStep.data != null)
         {
-            var openDoorsStep = currentGameState.open_doors.FirstOrDefault(od => od.step == step);
-            if (openDoorsStep != null && openDoorsStep.data != null)
+            foreach (var doorPair in openDoorsStep.data)
             {
-                foreach (var doorPair in openDoorsStep.data)
+                // Ajustar las coordenadas restando 1 al segundo valor
+                int[] originalCell1 = doorPair[0];
+                int[] originalCell2 = doorPair[1];
+
+                int fila1 = originalCell1[0];
+                int columna1 = originalCell1[1] - 1; // Restar 1 al segundo valor
+                int fila2 = originalCell2[0];
+                int columna2 = originalCell2[1] - 1; // Restar 1 al segundo valor
+
+                // Crear nuevas coordenadas ajustadas
+                int[] adjustedCell1 = new int[] { fila1, columna1 };
+                int[] adjustedCell2 = new int[] { fila2, columna2 };
+
+                string direction = GetDirectionBetweenCells(adjustedCell1, adjustedCell2);
+
+                string doorKey = GetWallKey(adjustedCell1[0], adjustedCell1[1], direction);
+
+                Debug.Log($"[PUERTA ABIERTA] doorKey: {doorKey}, fila: {adjustedCell1[0]}, columna: {adjustedCell1[1]}, dirección: {direction}");
+
+                if (wallGameObjects.ContainsKey(doorKey))
                 {
-                    int[] cell1 = doorPair[0];
-                    int[] cell2 = doorPair[1];
-
-                    string direction = GetDirectionBetweenCells(cell1, cell2);
-
-                    int fila = cell1[0];
-                    int columna = cell1[1];
-
-                    string doorKey = GetWallKey(fila, columna, direction);
-
-                    Debug.Log($"[PUERTA ABIERTA] doorKey: {doorKey}, fila: {fila}, columna: {columna}, dirección: {direction}");
-
-                    if (wallGameObjects.ContainsKey(doorKey))
-                    {
-                        // Eliminar la puerta del diccionario y destruir el GameObject
-                        GameObject door = wallGameObjects[doorKey];
-                        Destroy(door);
-                        wallGameObjects.Remove(doorKey);
-                        Debug.Log($"Puerta abierta y destruida entre celdas ({cell1[0]}, {cell1[1]}) y ({cell2[0]}, {cell2[1]}) dirección {direction}");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"No se encontró la puerta entre celdas ({cell1[0]}, {cell1[1]}) y ({cell2[0]}, {cell2[1]}) dirección {direction} para abrir/destruir.");
-                    }
+                    // Eliminar la puerta del diccionario y destruir el GameObject
+                    GameObject door = wallGameObjects[doorKey];
+                    Destroy(door);
+                    wallGameObjects.Remove(doorKey);
+                    Debug.Log($"Puerta abierta y destruida entre celdas ({adjustedCell1[0]}, {adjustedCell1[1]}) y ({adjustedCell2[0]}, {adjustedCell2[1]}) dirección {direction}");
+                }
+                else
+                {
+                    Debug.LogWarning($"No se encontró la puerta entre celdas ({adjustedCell1[0]}, {adjustedCell1[1]}) y ({adjustedCell2[0]}, {adjustedCell2[1]}) dirección {direction} para abrir/destruir.");
                 }
             }
         }
+    }
 
         // Actualizar los marcadores de fuego
         UpdateFireMarkers(step);
