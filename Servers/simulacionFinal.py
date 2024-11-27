@@ -230,35 +230,42 @@ class PenguinAgent(Agent):
         else:
             self.action_points += 4
 
-    def remove_wall(self, end):
-        if self.pos[0] < end[0]:
-            direction = "up"
-            self.model.cells[end[0]][end[1]].up = False
-            self.model.cells[self.pos[0]][self.pos[1]].down = False
-        elif self.pos[0] > end[0]:
-            direction = "down"
-            self.model.cells[end[0]][end[1]].down = False
-            self.model.cells[self.pos[0]][self.pos[1]].up = False
-        elif self.pos[1] < end[1]:
-            direction = "left"
-            self.model.cells[end[0]][end[1]].left = False
-            self.model.cells[self.pos[0]][self.pos[1]].right = False
-        elif self.pos[1] > end[1]:
-            direction = "right"
-            self.model.cells[end[0]][end[1]].right = False
-            self.model.cells[self.pos[0]][self.pos[1]].left = False
+    # def remove_wall(self, start_pos, end_pos):
+    #   """
+    #   Removes a wall between two cells.
+    #   """
+    #   x1, y1 = start_pos
+    #   x2, y2 = end_pos
 
-        self.model.structural_damage_left -= 2
+    #   # Determine the direction of the wall to remove
+    #   if x1 == x2:
+    #       if y1 < y2:
+    #           direction = "right"
+    #           opposite_direction = "left"
+    #       else:
+    #           direction = "left"
+    #           opposite_direction = "right"
+    #   elif y1 == y2:
+    #       if x1 < x2:
+    #           direction = "down"
+    #           opposite_direction = "up"
+    #       else:
+    #           direction = "up"
+    #           opposite_direction = "down"
 
-        # Registrar la pared destruida
-        wall_info = {
-            "cell": self.pos,
-            "neighbor": end,
-            "direction": direction
-        }
-        self.model.destroyed_walls.append(wall_info)
+    #   # Remove the wall between the cells
+    #   setattr(self.cells[x1][y1], direction, False)
+    #   setattr(self.cells[x2][y2], opposite_direction, False)
 
-        print(f"Pared removida por explosión en {self.pos} hacia {direction} con vecino {end}")
+    #   # Register the destroyed wall
+    #   wall_info = {
+    #       "cell": (x1, y1),
+    #       "neighbor": (x2, y2),
+    #       "direction": direction
+    #   }
+    #   self.destroyed_walls.append(wall_info)
+
+    #   print(f"Pared removida entre {start_pos} y {end_pos} en dirección {direction}")
 
     def clear_path(self, start, end):
         """Calcula el costo de despejar el camino de start a end, incluyendo puertas, paredes y fuego."""
@@ -290,29 +297,55 @@ class PenguinAgent(Agent):
         return action_points_cost
 
     def calculate_cost_and_clear(self, start, end, direction, opposite_direction):
-        """
-        Calcula el costo de moverse en una dirección específica y realiza las operaciones necesarias
-        para despejar puertas o paredes.
-        """
-        cost = 0
-        current_cell = self.model.cells[start[0]][start[1]]
-        target_cell = self.model.cells[end[0]][end[1]]
+      """
+      Calculates the cost of moving in a specific direction and performs necessary operations
+      to clear doors or walls.
+      """
+      cost = 0
+      current_cell = self.model.cells[start[0]][start[1]]
+      target_cell = self.model.cells[end[0]][end[1]]
 
-        # Si hay una pared o puerta en el camino
-        if getattr(target_cell, opposite_direction) or getattr(current_cell, direction):
-            # Verificar si es una puerta o una pared
-            if end not in current_cell.door:
-                # Es una pared, cuesta más romperla
-                cost += 4
-                self.remove_wall(end)
-            else:
-                # Es una puerta, cuesta menos cruzarla
-                cost += 1
-                current_cell.door.remove(end)
-                target_cell.door.remove(start)
-                self.remove_wall(end)
+      # Initialize wall indices based on direction
+      wall_indices = {
+          "up": (0, 2),
+          "left": (1, 3),
+          "down": (2, 0),
+          "right": (3, 1)
+      }
+      wall_index, opposite_wall_index = wall_indices[direction]
 
-        return cost
+      # If there is a wall or door in the way
+      if getattr(current_cell, direction) or getattr(target_cell, opposite_direction):
+          # Check if it's a door
+          if end in current_cell.door:
+              # It's a door, costs 1 to move through
+              cost += 1
+              # Optionally, you can handle door opening here
+          else:
+              # It's a wall, agent needs to spend action points to damage it
+              # Each 2 action points reduce wall health by 1
+              if current_cell.wall_health[wall_index] > 0:
+                  cost += 2  # Cost to damage the wall by 1
+                  current_cell.wall_health[wall_index] -= 1
+                  target_cell.wall_health[opposite_wall_index] -= 1
+
+                  if current_cell.wall_health[wall_index] == 1:
+                      self.model.structural_damage_left -= 1  # Damage for the first time
+                      print(f"Pared en {current_cell.pos} dañada por agente")
+                  elif current_cell.wall_health[wall_index] == 0:
+                      # Wall destroyed
+                      setattr(current_cell, direction, False)
+                      setattr(target_cell, opposite_direction, False)
+                      self.model.structural_damage_left -= 1  # Damage when destroyed
+                      self.model.remove_wall(start, end)
+                      print(f"Pared removida por agente en {current_cell.pos}")
+              else:
+                  # Wall is already destroyed, no extra cost
+                  cost += 1  # Cost to move through the open space
+      else:
+          cost += 1  # Normal movement cost
+
+      return cost
 
 
 # Clase Model
@@ -499,12 +532,12 @@ class MapModel(Model):
     # Esta función modela el comportamiento de las avalanchas
     def avalanche_dir(self, direction, cell):
       """
-      Maneja la propagación de una avalancha en la dirección especificada, afectando paredes, puertas y propagando fuego.
+      Handles the propagation of an avalanche in a specified direction, affecting walls, doors, and propagating fire.
       """
       if cell not in self.inside:
-          return  # No hace nada si la celda está fuera de la estructura.
+          return  # Do nothing if the cell is outside the structure.
 
-      # Mapeo de direcciones con ajustes de coordenadas y atributos de pared.
+      # Mapping of directions with coordinate adjustments and wall attributes.
       directions = {
           0: {"neighbor_offset": (-1, 0), "wall_index": 0, "opposite_wall_index": 2, "wall_attr": "up", "opposite_wall_attr": "down"},
           1: {"neighbor_offset": (0, -1), "wall_index": 1, "opposite_wall_index": 3, "wall_attr": "left", "opposite_wall_attr": "right"},
@@ -512,7 +545,7 @@ class MapModel(Model):
           3: {"neighbor_offset": (0, 1), "wall_index": 3, "opposite_wall_index": 1, "wall_attr": "right", "opposite_wall_attr": "left"},
       }
 
-      # Obtener los datos de la dirección.
+      # Get the data for the direction.
       dir_data = directions[direction]
       neighbor_offset = dir_data["neighbor_offset"]
       wall_index = dir_data["wall_index"]
@@ -520,32 +553,38 @@ class MapModel(Model):
       wall_attr = dir_data["wall_attr"]
       opposite_wall_attr = dir_data["opposite_wall_attr"]
 
-      # Identificar la celda vecina.
+      # Identify the neighboring cell.
       neighbor_pos = (cell.pos[0] + neighbor_offset[0], cell.pos[1] + neighbor_offset[1])
-      neighbor_cell = self.cells[neighbor_pos[0]][neighbor_pos[1]]
 
-      if cell.fire == 2:  # Caso: La celda está en fuego.
-          if neighbor_cell.pos in cell.door:
-              self.remove_door(cell, neighbor_cell, direction)
-          elif getattr(cell, wall_attr):  # Caso: Hay una pared.
-              # Reducir la salud de la pared en ambas celdas.
-              cell.wall_health[wall_index] -= 1
-              neighbor_cell.wall_health[opposite_wall_index] -= 1
+      # Check if neighbor position is within grid bounds
+      if 0 <= neighbor_pos[0] < self.height and 0 <= neighbor_pos[1] < self.width:
+          neighbor_cell = self.cells[neighbor_pos[0]][neighbor_pos[1]]
 
-              # Si la pared colapsa, eliminarla y actualizar el daño estructural.
-              if cell.wall_health[wall_index] == 0:
-                  setattr(cell, wall_attr, False)
-                  setattr(neighbor_cell, opposite_wall_attr, False)
-                  self.structural_damage_left -= 2
-                  self.remove_wall(cell.pos, neighbor_pos)
-                  print(f"Pared removida por avalancha en {cell.pos}")
+          if cell.fire == 2:  # Case: The cell is on fire.
+              if neighbor_cell.pos in cell.door:
+                  self.remove_door(cell, neighbor_cell, direction)
+              elif getattr(cell, wall_attr):  # Case: There is a wall.
+                  # Reduce the health of the wall in both cells.
+                  cell.wall_health[wall_index] -= 1
+                  neighbor_cell.wall_health[opposite_wall_index] -= 1
+
+                  # Check if the wall was damaged for the first time.
+                  if cell.wall_health[wall_index] == 1:
+                      self.structural_damage_left -= 1  # Damage for the first time
+                      print(f"Pared en {cell.pos} dañada por primera vez por avalancha")
+                  # If the wall collapses, remove it and update the structural damage.
+                  elif cell.wall_health[wall_index] == 0:
+                      setattr(cell, wall_attr, False)
+                      setattr(neighbor_cell, opposite_wall_attr, False)
+                      self.structural_damage_left -= 1  # Damage when destroyed
+                      self.remove_wall(cell.pos, neighbor_pos)
+                      print(f"Pared removida por avalancha en {cell.pos}")
+              else:
+                  # Recursive propagation if there are no obstacles.
+                  self.avalanche_dir(direction, neighbor_cell)
           else:
-              # Propagación recursiva si no hay obstáculos.
-              self.avalanche_dir(direction, neighbor_cell)
-      else:
-          # Si no hay fuego en la celda, asignarlo.
-          self.assign_fire(cell)
-      # Esta función quita las puertas del mapa debido a una explosión
+              # If the cell is not on fire, assign fire to it.
+              self.assign_fire(cell)
 
 
     def remove_door(self, cell1, cell2, direction):
@@ -725,6 +764,43 @@ class MapModel(Model):
                 if agent.target is None:
                     agent.target = agent.target  # Mantener como está
 
+    def remove_wall(self, start_pos, end_pos):
+        """
+        Removes a wall between two cells.
+        """
+        x1, y1 = start_pos
+        x2, y2 = end_pos
+
+        # Determine the direction of the wall to remove
+        if x1 == x2:
+            if y1 < y2:
+                direction = "right"
+                opposite_direction = "left"
+            else:
+                direction = "left"
+                opposite_direction = "right"
+        elif y1 == y2:
+            if x1 < x2:
+                direction = "down"
+                opposite_direction = "up"
+            else:
+                direction = "up"
+                opposite_direction = "down"
+
+        # Remove the wall between the cells
+        setattr(self.cells[x1][y1], direction, False)
+        setattr(self.cells[x2][y2], opposite_direction, False)
+
+        # Register the destroyed wall
+        wall_info = {
+            "cell": (x1, y1),
+            "neighbor": (x2, y2),
+            "direction": direction
+        }
+        self.destroyed_walls.append(wall_info)
+
+        print(f"Pared removida entre {start_pos} y {end_pos} en dirección {direction}")
+
     # Esta función indica las acciones que se toman en cada paso de la simulación
     def step(self):
         self.end_sim()
@@ -773,6 +849,8 @@ class MapModel(Model):
             print("\n")
             self.schedule.step()
 
+
+
 # Inicializa listas para almacenar los estados en cada paso
 total_steps_agents = []
 total_steps_fire = []
@@ -797,7 +875,6 @@ previous_dead_lifes = 0
 previous_dead_agents = 0
 previous_saved_lifes = 0
 previous_structural_damage_left = model.structural_damage_left
-
 
 while model.running:
 

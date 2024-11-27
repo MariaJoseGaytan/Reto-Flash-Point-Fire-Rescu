@@ -1,4 +1,6 @@
 # Librerías
+from flask import Flask, request, jsonify
+
 from mesa import Agent, Model
 from mesa.space import MultiGrid
 from mesa.time import RandomActivation
@@ -7,48 +9,47 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import numpy as np
 import json
-import random
 
 # Clase Cell que nos ayuda a guardar información
 class Cell():
     def __init__(self, x, y, wall):
         self.pos = (x, y)
         self.wall_health = [0, 0, 0, 0]
-        # lectura de muros del txt 0100 (arriba,izq,abajo,derecha)
-        # pared arriba
+        #lectura de muros del txt 0100 (arriba,izq,abajo,derecha)
+        #pared arriba
         if wall[0] == '1':
             self.up = True
             self.wall_health[0] = 2
         else:
             self.up = False
-        # pared izq
+        #pared izq
         if wall[1] == '1':
             self.left = True
             self.wall_health[1] = 2
         else:
             self.left = False
-        # pared abajo
+        #pared abajo
         if wall[2] == '1':
             self.down = True
             self.wall_health[2] = 2
         else:
             self.down = False
-        # pared derecha
+        #pared derecha
         if wall[3] == '1':
             self.right = True
             self.wall_health[3] = 2
         else:
             self.right = False
 
-        self.poi = 0  # usa 1 si es falsa alarma, 2 si es una víctima
-        self.fire = 0  # 1 si es humo, 2 si es fuego
+        self.poi = 0 #usa 1 si es falsa alarma, 2 si es una víctima
+        self.fire = 0 # 1 si es humo, 2 si es fuego
 
         # Arreglo con la posición de la casilla donde se conecta con puerta
         self.door = []
 
-        self.entrance = False  # es una entrada?
+        self.entrance = False #es una entrada?
 
-        self.inside_agents = 0  # num de agentes en la celda
+        self.inside_agents = 0 #num de agentes en la celda
 
 # Clase Agente
 class PenguinAgent(Agent):
@@ -56,7 +57,7 @@ class PenguinAgent(Agent):
         super().__init__(unique_id, model)
         self.target = target
         self.action_points = 4
-        self.lleva_puffle = 1  # 1 nada, 2 es víctima esto es para que el num de acciones de movimientos se multiplique y no tenga que haber un if
+        self.lleva_puffle = 1 #1 nada, 2 es víctima esto es para que el num de acciones de movimientos se multiplique y no tenga que haber un if
         self.path = []
 
     def step(self):
@@ -68,7 +69,7 @@ class PenguinAgent(Agent):
             while self.action_points >= 1 and self.pos != self.target.pos and self.path:
                 cost = self.clear_path(self.pos, self.path[0])
                 if self.action_points < cost:
-                    break  # si los puntos de acción exceden el costo de limpiar el camino no avanza
+                    break #si los puntos de acción exceden el costo de limpiar el camino no avanza
                 self.action_points -= cost
                 self.model.grid.move_agent(self, self.path.pop(0))
 
@@ -119,59 +120,60 @@ class PenguinAgent(Agent):
             self.model.interest_points.remove(point)
 
     def dijkstra(self, start, end):
-        # Crear un mapa para almacenar información de cada celda (pasos y celda previa en el camino)
-        dijkstra_map = {}
-        path = []
+      # Crear un mapa para almacenar información de cada celda (pasos y celda previa en el camino)
+      dijkstra_map = {}
+      path = []
 
-        # Inicializar el mapa de Dijkstra para todas las celdas del grid
-        for x in range(self.model.grid.height):
-            for y in range(self.model.grid.width):
-                dijkstra_map[(y, x)] = {"previous_cell": None, "steps": None}
+      # Inicializar el mapa de Dijkstra para todas las celdas del grid
+      for x in range(self.model.grid.height):
+          for y in range(self.model.grid.width):
+              dijkstra_map[(y, x)] = {"previous_cell": None, "steps": None}
 
-        # Verificar que los puntos de inicio y fin sean válidos y distintos
-        if start in dijkstra_map and end in dijkstra_map and start != end:
-            # Inicializar el punto de partida
-            dijkstra_map[start]["steps"] = 0
-            dijkstra_map[start]["previous_cell"] = start
-            queue = [start]  # Cola para explorar celdas
+      # Verificar que los puntos de inicio y fin sean válidos y distintos
+      if start in dijkstra_map and end in dijkstra_map and start != end:
+          # Inicializar el punto de partida
+          dijkstra_map[start]["steps"] = 0
+          dijkstra_map[start]["previous_cell"] = start
+          queue = [start]  # Cola para explorar celdas
 
-            # Recorrer las celdas en la cola mientras haya celdas por explorar
-            while queue:
-                current_cell = queue.pop(0)  # Obtener la celda actual de la cola
+          # Recorrer las celdas en la cola mientras haya celdas por explorar
+          while queue:
+              current_cell = queue.pop(0)  # Obtener la celda actual de la cola
 
-                # Obtener los vecinos de la celda actual
-                neighbors = self.model.grid.get_neighborhood(current_cell, moore=False)
+              # Obtener los vecinos de la celda actual
+              neighbors = self.model.grid.get_neighborhood(current_cell, moore=False)
 
-                for neighbor in neighbors:
-                    # Verificar si el vecino está dentro de los límites del grid
-                    if 0 <= neighbor[0] < self.model.grid.width and 0 <= neighbor[1] < self.model.grid.height:
-                        # Calcular el costo de moverse hacia el vecino
-                        cost_to_neighbor = self.calculate_steps(current_cell, neighbor)
+              for neighbor in neighbors:
+                  # Verificar si el vecino está dentro de los límites del grid
+                  if 0 <= neighbor[0] < self.model.grid.width and 0 <= neighbor[1] < self.model.grid.height:
+                      # Calcular el costo de moverse hacia el vecino
+                      cost_to_neighbor = self.calculate_steps(current_cell, neighbor)
 
-                        # Si el vecino no ha sido visitado, calcular su costo total
-                        if dijkstra_map[neighbor]["steps"] is None and cost_to_neighbor is not None:
-                            dijkstra_map[neighbor]["steps"] = dijkstra_map[current_cell]["steps"] + cost_to_neighbor
-                            dijkstra_map[neighbor]["previous_cell"] = current_cell
-                            queue.append(neighbor)
+                      # Si el vecino no ha sido visitado, calcular su costo total
+                      if dijkstra_map[neighbor]["steps"] is None and cost_to_neighbor is not None:
+                          dijkstra_map[neighbor]["steps"] = dijkstra_map[current_cell]["steps"] + cost_to_neighbor
+                          dijkstra_map[neighbor]["previous_cell"] = current_cell
+                          queue.append(neighbor)
 
-                        # Si ya fue visitado, actualizar si el nuevo costo es menor
-                        elif dijkstra_map[neighbor]["steps"] > dijkstra_map[current_cell]["steps"] + cost_to_neighbor:
-                            dijkstra_map[neighbor]["steps"] = dijkstra_map[current_cell]["steps"] + cost_to_neighbor
-                            dijkstra_map[neighbor]["previous_cell"] = current_cell
-                            queue.append(neighbor)
+                      # Si ya fue visitado, actualizar si el nuevo costo es menor
+                      elif dijkstra_map[neighbor]["steps"] > dijkstra_map[current_cell]["steps"] + cost_to_neighbor:
+                          dijkstra_map[neighbor]["steps"] = dijkstra_map[current_cell]["steps"] + cost_to_neighbor
+                          dijkstra_map[neighbor]["previous_cell"] = current_cell
+                          queue.append(neighbor)
 
-            # Reconstruir el camino desde el punto final hasta el inicial
-            current_position = end
-            while current_position != start and dijkstra_map[current_position]["previous_cell"] is not None:
-                path.insert(0, current_position)  # Agregar al inicio de la lista
-                current_position = dijkstra_map[current_position]["previous_cell"]
+          # Reconstruir el camino desde el punto final hasta el inicial
+          current_position = end
+          while current_position != start and dijkstra_map[current_position]["previous_cell"] is not None:
+              path.insert(0, current_position)  # Agregar al inicio de la lista
+              current_position = dijkstra_map[current_position]["previous_cell"]
 
-            # Retornar el camino y el costo total
-            total_cost = dijkstra_map[end]["steps"] if dijkstra_map[end]["steps"] is not None else 0
-            return path, total_cost
-        else:
-            # Si los puntos son inválidos o son iguales, devolver el punto final y un costo 0
-            return [end], 0
+          # Retornar el camino y el costo total
+          total_cost = dijkstra_map[end]["steps"] if dijkstra_map[end]["steps"] is not None else 0
+          return path, total_cost
+      else:
+          # Si los puntos son inválidos o son iguales, devolver el punto final y un costo 0
+          return [end], 0
+
 
     def calculate_steps(self, start, end):
         # Inicializar el costo de puntos de acción
@@ -228,35 +230,42 @@ class PenguinAgent(Agent):
         else:
             self.action_points += 4
 
-    def remove_wall(self, end):
-        if self.pos[0] < end[0]:
-            direction = "up"
-            self.model.cells[end[0]][end[1]].up = False
-            self.model.cells[self.pos[0]][self.pos[1]].down = False
-        elif self.pos[0] > end[0]:
-            direction = "down"
-            self.model.cells[end[0]][end[1]].down = False
-            self.model.cells[self.pos[0]][self.pos[1]].up = False
-        elif self.pos[1] < end[1]:
-            direction = "left"
-            self.model.cells[end[0]][end[1]].left = False
-            self.model.cells[self.pos[0]][self.pos[1]].right = False
-        elif self.pos[1] > end[1]:
-            direction = "right"
-            self.model.cells[end[0]][end[1]].right = False
-            self.model.cells[self.pos[0]][self.pos[1]].left = False
+    # def remove_wall(self, start_pos, end_pos):
+    #   """
+    #   Removes a wall between two cells.
+    #   """
+    #   x1, y1 = start_pos
+    #   x2, y2 = end_pos
 
-        self.model.structural_damage_left -= 2
+    #   # Determine the direction of the wall to remove
+    #   if x1 == x2:
+    #       if y1 < y2:
+    #           direction = "right"
+    #           opposite_direction = "left"
+    #       else:
+    #           direction = "left"
+    #           opposite_direction = "right"
+    #   elif y1 == y2:
+    #       if x1 < x2:
+    #           direction = "down"
+    #           opposite_direction = "up"
+    #       else:
+    #           direction = "up"
+    #           opposite_direction = "down"
 
-        # Registrar la pared destruida
-        wall_info = {
-            "cell": self.pos,
-            "neighbor": end,
-            "direction": direction
-        }
-        self.model.destroyed_walls.append(wall_info)
+    #   # Remove the wall between the cells
+    #   setattr(self.cells[x1][y1], direction, False)
+    #   setattr(self.cells[x2][y2], opposite_direction, False)
 
-        print(f"Pared removida por explosión en {self.pos} hacia {direction} con vecino {end}")
+    #   # Register the destroyed wall
+    #   wall_info = {
+    #       "cell": (x1, y1),
+    #       "neighbor": (x2, y2),
+    #       "direction": direction
+    #   }
+    #   self.destroyed_walls.append(wall_info)
+
+    #   print(f"Pared removida entre {start_pos} y {end_pos} en dirección {direction}")
 
     def clear_path(self, start, end):
         """Calcula el costo de despejar el camino de start a end, incluyendo puertas, paredes y fuego."""
@@ -279,8 +288,7 @@ class PenguinAgent(Agent):
         # Agregar costo adicional si el destino tiene fuego
         if self.model.cells[end[0]][end[1]].fire == 2:
             action_points_cost += 1
-            if self.model.cells[end[0]][end[1]] in self.model.fire_points:
-                self.model.fire_points.remove(self.model.cells[end[0]][end[1]])
+            self.model.fire_points.remove(self.model.cells[end[0]][end[1]])
             self.model.cells[end[0]][end[1]].fire = 0
 
         # Añadir el costo de llevar una víctima
@@ -289,29 +297,56 @@ class PenguinAgent(Agent):
         return action_points_cost
 
     def calculate_cost_and_clear(self, start, end, direction, opposite_direction):
-        """
-        Calcula el costo de moverse en una dirección específica y realiza las operaciones necesarias
-        para despejar puertas o paredes.
-        """
-        cost = 0
-        current_cell = self.model.cells[start[0]][start[1]]
-        target_cell = self.model.cells[end[0]][end[1]]
+      """
+      Calculates the cost of moving in a specific direction and performs necessary operations
+      to clear doors or walls.
+      """
+      cost = 0
+      current_cell = self.model.cells[start[0]][start[1]]
+      target_cell = self.model.cells[end[0]][end[1]]
 
-        # Si hay una pared o puerta en el camino
-        if getattr(target_cell, opposite_direction) or getattr(current_cell, direction):
-            # Verificar si es una puerta o una pared
-            if end not in current_cell.door:
-                # Es una pared, cuesta más romperla
-                cost += 4
-                self.remove_wall(end)
-            else:
-                # Es una puerta, cuesta menos cruzarla
-                cost += 1
-                current_cell.door.remove(end)
-                target_cell.door.remove(start)
-                self.remove_wall(end)
+      # Initialize wall indices based on direction
+      wall_indices = {
+          "up": (0, 2),
+          "left": (1, 3),
+          "down": (2, 0),
+          "right": (3, 1)
+      }
+      wall_index, opposite_wall_index = wall_indices[direction]
 
-        return cost
+      # If there is a wall or door in the way
+      if getattr(current_cell, direction) or getattr(target_cell, opposite_direction):
+          # Check if it's a door
+          if end in current_cell.door:
+              # It's a door, costs 1 to move through
+              cost += 1
+              # Optionally, you can handle door opening here
+          else:
+              # It's a wall, agent needs to spend action points to damage it
+              # Each 2 action points reduce wall health by 1
+              if current_cell.wall_health[wall_index] > 0:
+                  cost += 2  # Cost to damage the wall by 1
+                  current_cell.wall_health[wall_index] -= 1
+                  target_cell.wall_health[opposite_wall_index] -= 1
+
+                  if current_cell.wall_health[wall_index] == 1:
+                      self.model.structural_damage_left -= 1  # Damage for the first time
+                      print(f"Pared en {current_cell.pos} dañada por agente")
+                  elif current_cell.wall_health[wall_index] == 0:
+                      # Wall destroyed
+                      setattr(current_cell, direction, False)
+                      setattr(target_cell, opposite_direction, False)
+                      self.model.structural_damage_left -= 1  # Damage when destroyed
+                      self.model.remove_wall(start, end)
+                      print(f"Pared removida por agente en {current_cell.pos}")
+              else:
+                  # Wall is already destroyed, no extra cost
+                  cost += 1  # Cost to move through the open space
+      else:
+          cost += 1  # Normal movement cost
+
+      return cost
+
 
 # Clase Model
 class MapModel(Model):
@@ -342,7 +377,7 @@ class MapModel(Model):
         for i in range(self.num_agents):
             agent = PenguinAgent(i, self)
             self.schedule.add(agent)
-            self.grid.place_agent(agent, (0, 0))
+            self.grid.place_agent(agent, (0,0))
             self.position_agent(agent)
 
     # Esta función posiciona a los agentes en una celda aleatoria fuera de la casa
@@ -352,85 +387,114 @@ class MapModel(Model):
 
     # Esta función lee el archivo de texto de entrada y coloca la información en una matriz y un arreglo (cells y outside)
     def read_map_data(self):
-        # Simulación simplificada para evitar dependencias de archivos
-        # Reemplaza este bloque con tu lógica de lectura de 'final.txt'
-        walls = ["0100"] * (8 * 6)  # Ejemplo: todas las celdas con pared arriba
-        alerts = [("3", "4", "v"), ("5", "6", "f"), ("7", "8", "v")]
-        fires = [("2", "3"), ("4", "5"), ("6", "7"), ("8", "9"), ("1", "2"),
-                 ("3", "4"), ("5", "6"), ("7", "8"), ("9", "0"), ("0", "1")]
-        doors = [(("1", "1"), ("1", "2")), (("2", "2"), ("2", "3")), (("3", "3"), ("3", "4")),
-                 (("4", "4"), ("4", "5")), (("5", "5"), ("5", "6")), (("6", "6"), ("6", "7")),
-                 (("7", "7"), ("7", "8")), (("8", "8"), ("8", "9"))]
-        exits = [("1", "0"), ("6", "9"), ("7", "0"), ("7", "9")]
+        with open('final.txt', 'r') as map_file:
+            text = map_file.read()
 
-        cells = []
-        for i in range(6):
-            for j in range(8):
-                cell_walls = walls[0]
-                del walls[0]
+            walls = []
+            for i in range(8):
+                for j in range(6):
+                    new_wall = text[:4]
+                    walls.append(new_wall)
+                    text = text[5:]
 
-                c = Cell(i + 1, j + 1, cell_walls)
-                cells.append(c)
+            alerts = []
+            for i in range(3):
+                pos_alert_x = text[0]
+                pos_alert_y = text[2]
+                pos_alert_state = text[4]
+                text = text[6:]
+                alerts.append( (pos_alert_x, pos_alert_y, pos_alert_state) )
 
-                if (str(i + 1), str(j + 1), 'v') in alerts:
-                    c.poi = 2
-                elif (str(i + 1), str(j + 1), 'f') in alerts:
-                    c.poi = 1
+            fires = []
+            for i in range(10):
+                pos_fire_x = text[0]
+                pos_fire_y = text[2]
+                text = text[4:]
+                fires.append( (pos_fire_x, pos_fire_y) )
 
-                if (str(i + 1), str(j + 1)) in fires:
-                    c.fire = 2
+            doors = []
+            for i in range(8):
+                pos_doorA_x = text[0]
+                pos_doorA_y = text[2]
+                pos_doorB_x = text[4]
+                pos_doorB_y = text[6]
+                text = text[8:]
+                doors.append( ( (pos_doorA_x, pos_doorA_y), (pos_doorB_x, pos_doorB_y) ) )
 
-                for d in doors:
-                    if (str(i + 1), str(j + 1)) == d[0]:
-                        c.door.append((int(d[1][0]), int(d[1][1])))
-                    elif (str(i + 1), str(j + 1)) == d[1]:
-                        c.door.append((int(d[0][0]), int(d[0][1])))
+            exits = []
+            for i in range(4):
+                pos_exit_x = text[0]
+                pos_exit_y = text[2]
+                text = text[4:]
+                exits.append( (pos_exit_x, pos_exit_y) )
 
-                if (str(i + 1), str(j + 1)) in exits:
-                    c.entrance = True
+            cells = []
+            for i in range(6):
+                for j in range(8):
+                    cell_walls = walls[0]
+                    del walls[0]
 
-        # Agregar celdas exteriores
-        new_cells = [
-            Cell(0, 0, "0000"),
-            Cell(0, 1, "0010"),
-            Cell(0, 2, "0010"),
-            Cell(0, 3, "0010"),
-            Cell(0, 4, "0010"),
-            Cell(0, 5, "0010"),
-            Cell(0, 6, "0010"),
-            Cell(0, 7, "0010"),
-            Cell(0, 8, "0010"),
-            Cell(0, 9, "0000"),
-        ]
-        outside = new_cells.copy()
-        cells = new_cells + cells
-        for i in range(1, 7):
-            c = Cell(i, 0, "0001")
-            cells.insert(i * 10, c)
-            outside.append(c)
-            c = Cell(i, 9, "0100")
-            cells.insert((i * 10) + 9, c)
-            outside.append(c)
-        new_cells = [
-            Cell(7, 0, "0000"),
-            Cell(7, 1, "1000"),
-            Cell(7, 2, "1000"),
-            Cell(7, 3, "1000"),
-            Cell(7, 4, "1000"),
-            Cell(7, 5, "1000"),
-            Cell(7, 6, "1000"),
-            Cell(7, 7, "1000"),
-            Cell(7, 8, "1000"),
-            Cell(7, 9, "0000"),
-        ]
-        outside = outside + new_cells
-        cells = cells + new_cells
-        map_grid = [[None for _ in range(10)] for _ in range(8)]
-        for cell in cells:
-            y, x = cell.pos
-            if 0 <= y < 8 and 0 <= x < 10:
+                    c = Cell(i + 1, j + 1, cell_walls)
+                    cells.append(c)
+
+                    if (str(i + 1), str(j + 1), 'v') in alerts:
+                        c.poi = 2
+                    elif (str(i + 1), str(j + 1), 'f') in alerts:
+                        c.poi = 1
+
+                    if (str(i + 1), str(j + 1)) in fires:
+                        c.fire = 2
+
+                    for d in doors:
+                        if (str(i + 1), str(j + 1)) == d[0]:
+                            c.door.append((int(d[1][0]), int(d[1][1])))
+                        elif (str(i + 1), str(j + 1)) == d[1]:
+                            c.door.append((int(d[0][0]), int(d[0][1])))
+
+                    if (str(i + 1), str(j + 1)) in exits:
+                        c.entrance = True
+
+            # Agregar celdas exteriores
+            new_cells = [
+                Cell(0, 0, "0000"),
+                Cell(0, 1, "0010"),
+                Cell(0, 2, "0010"),
+                Cell(0, 3, "0010"),
+                Cell(0, 4, "0010"),
+                Cell(0, 5, "0010"),
+                Cell(0, 6, "0010"),
+                Cell(0, 7, "0010"),
+                Cell(0, 8, "0010"),
+                Cell(0, 9, "0000"),
+            ]
+            outside = new_cells
+            cells = new_cells + cells
+            for i in range(1, 7):
+                c = Cell(i, 0, "0001")
+                cells.insert(i * 10, c)
+                outside.append(c)
+                c = Cell(i, 9, "0100")
+                cells.insert((i * 10) + 9, c)
+                outside.append(c)
+            new_cells = [
+                Cell(7, 0, "0000"),
+                Cell(7, 1, "1000"),
+                Cell(7, 2, "1000"),
+                Cell(7, 3, "1000"),
+                Cell(7, 4, "1000"),
+                Cell(7, 5, "1000"),
+                Cell(7, 6, "1000"),
+                Cell(7, 7, "1000"),
+                Cell(7, 8, "1000"),
+                Cell(7, 9, "0000"),
+            ]
+            outside = outside + new_cells
+            cells = cells + new_cells
+            map_grid = [[None for _ in range(10)] for _ in range(8)]
+            for cell in cells:
+                y, x = cell.pos
                 map_grid[y][x] = cell
-        return map_grid, outside
+            return map_grid, outside
 
     # Esta función indica las puertas de entrada en la matriz cells
     def put_entrance_doors(self):
@@ -467,55 +531,61 @@ class MapModel(Model):
 
     # Esta función modela el comportamiento de las avalanchas
     def avalanche_dir(self, direction, cell):
-        """
-        Maneja la propagación de una avalancha en la dirección especificada, afectando paredes, puertas y propagando fuego.
-        """
-        if cell not in self.inside:
-            return  # No hace nada si la celda está fuera de la estructura.
+      """
+      Handles the propagation of an avalanche in a specified direction, affecting walls, doors, and propagating fire.
+      """
+      if cell not in self.inside:
+          return  # Do nothing if the cell is outside the structure.
 
-        # Mapeo de direcciones con ajustes de coordenadas y atributos de pared.
-        directions = {
-            0: {"neighbor_offset": (-1, 0), "wall_index": 0, "opposite_wall_index": 2, "wall_attr": "up", "opposite_wall_attr": "down"},
-            1: {"neighbor_offset": (0, -1), "wall_index": 1, "opposite_wall_index": 3, "wall_attr": "left", "opposite_wall_attr": "right"},
-            2: {"neighbor_offset": (1, 0), "wall_index": 2, "opposite_wall_index": 0, "wall_attr": "down", "opposite_wall_attr": "up"},
-            3: {"neighbor_offset": (0, 1), "wall_index": 3, "opposite_wall_index": 1, "wall_attr": "right", "opposite_wall_attr": "left"},
-        }
+      # Mapping of directions with coordinate adjustments and wall attributes.
+      directions = {
+          0: {"neighbor_offset": (-1, 0), "wall_index": 0, "opposite_wall_index": 2, "wall_attr": "up", "opposite_wall_attr": "down"},
+          1: {"neighbor_offset": (0, -1), "wall_index": 1, "opposite_wall_index": 3, "wall_attr": "left", "opposite_wall_attr": "right"},
+          2: {"neighbor_offset": (1, 0), "wall_index": 2, "opposite_wall_index": 0, "wall_attr": "down", "opposite_wall_attr": "up"},
+          3: {"neighbor_offset": (0, 1), "wall_index": 3, "opposite_wall_index": 1, "wall_attr": "right", "opposite_wall_attr": "left"},
+      }
 
-        # Obtener los datos de la dirección.
-        dir_data = directions[direction]
-        neighbor_offset = dir_data["neighbor_offset"]
-        wall_index = dir_data["wall_index"]
-        opposite_wall_index = dir_data["opposite_wall_index"]
-        wall_attr = dir_data["wall_attr"]
-        opposite_wall_attr = dir_data["opposite_wall_attr"]
+      # Get the data for the direction.
+      dir_data = directions[direction]
+      neighbor_offset = dir_data["neighbor_offset"]
+      wall_index = dir_data["wall_index"]
+      opposite_wall_index = dir_data["opposite_wall_index"]
+      wall_attr = dir_data["wall_attr"]
+      opposite_wall_attr = dir_data["opposite_wall_attr"]
 
-        # Identificar la celda vecina.
-        neighbor_pos = (cell.pos[0] + neighbor_offset[0], cell.pos[1] + neighbor_offset[1])
-        if not (0 <= neighbor_pos[0] < self.height and 0 <= neighbor_pos[1] < self.width):
-            return  # Fuera de los límites
-        neighbor_cell = self.cells[neighbor_pos[0]][neighbor_pos[1]]
+      # Identify the neighboring cell.
+      neighbor_pos = (cell.pos[0] + neighbor_offset[0], cell.pos[1] + neighbor_offset[1])
 
-        if cell.fire == 2:  # Caso: La celda está en fuego.
-            if neighbor_cell.pos in cell.door:
-                self.remove_door(cell, neighbor_cell, direction)
-            elif getattr(cell, wall_attr):  # Caso: Hay una pared.
-                # Reducir la salud de la pared en ambas celdas.
-                cell.wall_health[wall_index] -= 1
-                neighbor_cell.wall_health[opposite_wall_index] -= 1
+      # Check if neighbor position is within grid bounds
+      if 0 <= neighbor_pos[0] < self.height and 0 <= neighbor_pos[1] < self.width:
+          neighbor_cell = self.cells[neighbor_pos[0]][neighbor_pos[1]]
 
-                # Si la pared colapsa, eliminarla y actualizar el daño estructural.
-                if cell.wall_health[wall_index] == 0:
-                    setattr(cell, wall_attr, False)
-                    setattr(neighbor_cell, opposite_wall_attr, False)
-                    self.structural_damage_left -= 2
-                    self.remove_wall(cell.pos, neighbor_pos)
-                    print(f"Pared removida por avalancha en {cell.pos}")
-            else:
-                # Propagación recursiva si no hay obstáculos.
-                self.avalanche_dir(direction, neighbor_cell)
-        else:
-            # Si no hay fuego en la celda, asignarlo.
-            self.assign_fire(cell)
+          if cell.fire == 2:  # Case: The cell is on fire.
+              if neighbor_cell.pos in cell.door:
+                  self.remove_door(cell, neighbor_cell, direction)
+              elif getattr(cell, wall_attr):  # Case: There is a wall.
+                  # Reduce the health of the wall in both cells.
+                  cell.wall_health[wall_index] -= 1
+                  neighbor_cell.wall_health[opposite_wall_index] -= 1
+
+                  # Check if the wall was damaged for the first time.
+                  if cell.wall_health[wall_index] == 1:
+                      self.structural_damage_left -= 1  # Damage for the first time
+                      print(f"Pared en {cell.pos} dañada por primera vez por avalancha")
+                  # If the wall collapses, remove it and update the structural damage.
+                  elif cell.wall_health[wall_index] == 0:
+                      setattr(cell, wall_attr, False)
+                      setattr(neighbor_cell, opposite_wall_attr, False)
+                      self.structural_damage_left -= 1  # Damage when destroyed
+                      self.remove_wall(cell.pos, neighbor_pos)
+                      print(f"Pared removida por avalancha en {cell.pos}")
+              else:
+                  # Recursive propagation if there are no obstacles.
+                  self.avalanche_dir(direction, neighbor_cell)
+          else:
+              # If the cell is not on fire, assign fire to it.
+              self.assign_fire(cell)
+
 
     def remove_door(self, cell1, cell2, direction):
         self.cells[cell1.pos[0]][cell1.pos[1]].door.remove(cell2.pos)
@@ -595,13 +665,14 @@ class MapModel(Model):
         self.fire_points.append(smoke)  # Agregar la celda a los puntos de fuego.
         self.smokes.remove(smoke)  # Eliminar la celda de la lista de humos.
 
+
     # Esta función determina el final de la simulación
     def end_sim(self):
         if self.structural_damage_left <= 0:
             print("Derrota: Demasiado daño a la cueva")
             self.running = False
         elif self.dead_lifes >= 4:
-            print("Derrota: Demasiadas pérdidas")
+            print("Derrota: Demasiadas perdidas")
             self.running = False
         elif self.saved_lifes >= 7:
             print("Victoria: Puffles rescatados")
@@ -693,8 +764,45 @@ class MapModel(Model):
                 if agent.target is None:
                     agent.target = agent.target  # Mantener como está
 
+    def remove_wall(self, start_pos, end_pos):
+        """
+        Removes a wall between two cells.
+        """
+        x1, y1 = start_pos
+        x2, y2 = end_pos
+
+        # Determine the direction of the wall to remove
+        if x1 == x2:
+            if y1 < y2:
+                direction = "right"
+                opposite_direction = "left"
+            else:
+                direction = "left"
+                opposite_direction = "right"
+        elif y1 == y2:
+            if x1 < x2:
+                direction = "down"
+                opposite_direction = "up"
+            else:
+                direction = "up"
+                opposite_direction = "down"
+
+        # Remove the wall between the cells
+        setattr(self.cells[x1][y1], direction, False)
+        setattr(self.cells[x2][y2], opposite_direction, False)
+
+        # Register the destroyed wall
+        wall_info = {
+            "cell": (x1, y1),
+            "neighbor": (x2, y2),
+            "direction": direction
+        }
+        self.destroyed_walls.append(wall_info)
+
+        print(f"Pared removida entre {start_pos} y {end_pos} en dirección {direction}")
+
     # Esta función indica las acciones que se toman en cada paso de la simulación
-    def step_simulation(self):
+    def step(self):
         self.end_sim()
         print(f"Vidas salvadas: {self.saved_lifes}, Muertes: {self.dead_lifes}, Daño Estructural Restante: {self.structural_damage_left}, Agentes muertos: {self.dead_agents}")
         if self.running:
@@ -746,7 +854,7 @@ def run_single_simulation():
     model = MapModel(6)
     
     while model.running:
-        model.step_simulation()
+        model.step()
         model.steps += 1
 
     # Determinar si fue victoria o derrota
@@ -851,7 +959,7 @@ def generar_graficas(resultados):
 # Ejecutar las simulaciones y generar las gráficas
 if __name__ == '__main__':
     # Ejecutar las simulaciones y obtener los resultados detallados
-    resultados_finales = run_multiple_simulations(100)  # Cambia a 100 o el número que desees
+    resultados_finales = run_multiple_simulations(500)  
     
     # Generar las gráficas basadas en los resultados
     generar_graficas(resultados_finales)
